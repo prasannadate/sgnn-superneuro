@@ -1,0 +1,6 @@
+ipykernel
+matplotlib
+networkx
+numpy
+scikit-learn
+superneuromat
