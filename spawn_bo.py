@@ -2,6 +2,7 @@
 from multiprocessing import Pool
 import numpy as np
 import omegaconf
+import wandb
 
 # project specific pip imports
 from lmao.solver import BOSolver

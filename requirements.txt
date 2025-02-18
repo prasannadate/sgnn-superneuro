@@ -7,3 +7,4 @@ omegaconf
 scikit-learn
 superneuromat
 tabulate
+wandb
