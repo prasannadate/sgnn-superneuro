@@ -6,3 +6,4 @@ asteval<0.10,>=0.9.31
 omegaconf
 scikit-learn
 superneuromat
+tabulate
