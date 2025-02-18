@@ -16,7 +16,6 @@ graph:
 paper:
   leak: 0.0  # Choices: [1., 10., 100., 100000.]
   threshold: 1.0  # Choices: [0.25, 0.5, 0.75, 1.0, 1.5]
-  # tau_minus: 30.0  # Choices: [5., 10., 15., 20., 25., 30., 40., 50.]
 stdp:
   A_pos: 0.1  # Choices: [0.01, 0.1, 1.0, 10.0]
   A_neg: 0.0001  # Choices: [0.00001, 0.0001, 0.001, 0.01]
@@ -25,12 +24,9 @@ test:
 test_to_topic:
   weight: 0.001  # Choices: [0.001, 0.005, 0.01, 0.05, 0.1]
   delay: 1.0  # Choices: [1., 2., 5., 10., 20.]
-#   alpha: 1.0  # Choices: [0.5, 1.0, 2.0, 5.0]
-#   tau_plus: 30.0  # Choices: [5., 10., 15., 20., 25., 30., 40., 50.]
 topic:
   leak: 0.0  # Choices: [1., 10., 100., 100000.]
   threshold: 0.5  # Choices: [0.25, 0.5, 0.75, 1.0, 1.5]
-#   tau_minus: 30.0  # Choices: [5., 10., 15., 20., 25., 30., 40., 50.]
 train:
   ref: 1.0  # Choices: [1.0, 5.0, 10.0, 100.0, 1000.0]
 train_to_topic:
@@ -41,5 +37,3 @@ validation:
 validation_to_topic:
   weight: 0.001  # Choices: [0.001, 0.005, 0.01, 0.05, 0.1]
   delay: 1.0  # Choices: [1., 2., 5., 10., 20.]
-#   alpha: 1.0  # Choices: [0.5, 1.0, 2.0, 5.0]
-#   tau_plus: 30.0  # Choices: [5., 10., 15., 20., 25., 30., 40., 50.]
