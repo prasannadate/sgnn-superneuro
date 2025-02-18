@@ -1,13 +1,13 @@
-import sys
+import argparse
+import matplotlib.pyplot as plt
+from multiprocessing import Pool
 import networkx as nx
 import numpy as np
-import matplotlib.pyplot as plt
-import argparse
-from multiprocessing import Pool
-from superneuromat.neuromorphicmodel import NeuromorphicModel
-import numpy as np
-from sklearn.metrics import confusion_matrix, classification_report
 from omegaconf import DictConfig, OmegaConf
+from sklearn.metrics import confusion_matrix, classification_report
+import sys
+
+from superneuromat.neuromorphicmodel import NeuromorphicModel
 
 
 class GraphData():
