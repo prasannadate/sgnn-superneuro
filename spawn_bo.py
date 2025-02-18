@@ -1,7 +1,11 @@
 # standard pip imports
+import copy
 from multiprocessing import Pool
 import numpy as np
 import omegaconf
+from omegaconf import DictConfig
+from skopt import Space
+from skopt.space import Categorical, Integer, Real
 import wandb
 
 # project specific pip imports
@@ -14,6 +18,7 @@ from sgnn import (
     test_paper,
 )
 from utils import (
+    evaluate_predictions,
     parse_args,
     plot_confusion_matrix,
     print_introduction,
@@ -21,9 +26,16 @@ from utils import (
     validate_overrides,
 )
 
+def solve_gnn(arg1: int) -> float:
+    """
+    Solve the GNN model with the specific BO configuration.
+    """
+    local_config = copy.deepcopy(DEFAULT_CONFIG)
+    local_config = omegaconf.OmegaConf.merge(local_config, override_config)
 
-def solve_gnn(args) -> float:
-    graph = GraphData(args.dataset, config)    
+    np.random.seed(local_config.seed)
+
+    graph = GraphData(local_config.dataset, config)    
     
     if (config["monitors"] == True):
         for i in range(0, len(graph.validation_papers), 20):
@@ -37,8 +49,8 @@ def solve_gnn(args) -> float:
     correct = 0
     total = 0
 
-    pool = Pool(args.processes)
-    if args.mode == "validation":
+    pool = Pool(local_config.processes)
+    if local_config.mode == "validation":
         papers = []
         for paper in graph.validation_papers:
             papers.append([paper, graph, config])
@@ -55,7 +67,7 @@ def solve_gnn(args) -> float:
         # Evaluate with confusion matrix, classification report, etc.
         evaluate_predictions(graph, predictions)
  
-    if args.mode == "test":
+    if local_config.mode == "test":
         papers = []
         for paper in graph.test_papers:
             papers.append([paper, graph, config])
@@ -72,29 +84,28 @@ def main(config: omegaconf.DictConfig) -> None:
         config (omegaconf.DictConfig): Merged configuration.
     """
 
-    solve_gnn(config)
+    global DEFAULT_CONFIG
+    DEFAULT_CONFIG = config
 
-    # np.random.seed(args.seed)
+    search_space = Space([
+        Categorical([10, 20, 30, 40, 50], name="paper_tau_minus"),
+    ])
 
-    # NUM_PROCESSES = args.processes
+    num_initial_points: int = 3
 
-    # search_space = Space([
-    #     Categorical([10, 20, 30, 40, 50], name="paper_tau_minus"),
-    # ])
+    optimizer_config = DictConfig({
+        "num_initial_points": config.bo.num_initial_points,
+        "max_iterations": config.bo.max_iterations,
+        "num_processes": 1,
+        "num_repeats": 1,
+        "optimizer_class": "gp-cpu",
+        "optimizer": {
+            "num_initial_points": config.bo.num_initial_points,
+        },
+        "seed": config.seed,
+    })
 
-    # num_initial_points: int = 3
-
-    # optimizer_config = DictConfig({
-    #     "num_initial_points": num_initial_points,
-    #     "max_iterations": 10,
-    #     "num_processes": 1,
-    #     "num_repeats": 1,
-    #     "optimizer_class": "gp-cpu",
-    #     "optimizer": {
-    #         "num_initial_points": num_initial_points,
-    #     },
-    #     "seed": 10,
-    # })
+    solve_gnn({})
 
     # solver = BOSolver(optimizer_config)
     # result = solver.solve(
@@ -102,7 +113,6 @@ def main(config: omegaconf.DictConfig) -> None:
     #     use_lp=False,
     #     search_space=search_space
     # )
-
 
 
 if __name__ == "__main__":

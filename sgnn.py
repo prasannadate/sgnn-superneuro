@@ -18,8 +18,8 @@ def load_network(graph, config):
         if (node not in graph.paper_to_topic.keys()):
             continue
         neuron_id = model.create_neuron(
-            threshold=config["paper_threshold"],
-            leak=config["paper_leak"],
+            threshold=config.paper.threshold,
+            leak=config.paper.leak,
             reset_state=0.0,
             refractory_period=0,  # Will set below based on paper type
         )
@@ -27,33 +27,22 @@ def load_network(graph, config):
 
         # Set refractory periods based on paper type
         if node in graph.train_papers:
-            model.neuron_refractory_periods[neuron_id] = config["train_ref"]
+            model.neuron_refractory_periods[neuron_id] = config.train.ref
         elif node in graph.validation_papers:
-            model.neuron_refractory_periods[neuron_id] = config["validation_ref"]
+            model.neuron_refractory_periods[neuron_id] = config.validation.ref
         elif node in graph.test_papers:
-            model.neuron_refractory_periods[neuron_id] = config["test_ref"]
+            model.neuron_refractory_periods[neuron_id] = config.test.ref
 
     # Create topic neurons
     for t in graph.topics:
         neuron_id = model.create_neuron(
-            threshold=config["topic_threshold"],
-            leak=config["topic_leak"],
+            threshold=config.topic.threshold,
+            leak=config.topic.leak,
             reset_state=0.0,
             refractory_period=0, 
         )
         topic_neurons[t] = neuron_id
         # Setting tau_minus is not directly supported
-
-    # Create feature neurons if features are enabled
-    if config["features"] == 1:
-        for i in range(graph.num_features):
-            neuron_id = model.create_neuron(
-                threshold=config["feature_threshold"],
-                leak=config["feature_leak"],
-                reset_state=0.0,
-                refractory_period=config["feature_ref"],
-            )
-            feature_neurons[i] = neuron_id
 
     # Connect paper neurons based on the graph edges
     for edge in graph.graph.edges:
@@ -63,9 +52,9 @@ def load_network(graph, config):
         post_id = paper_neurons[edge[1]]
         variation_scale = 0.01
 
-        w = config["graph_weight"]
+        w = config.graph.weight
         w *= (1.0 + np.random.normal(0, variation_scale))
-        d = int(config["graph_delay"])
+        d = int(config.graph.delay)
         model.create_synapse(pre_id, post_id, weight=w, delay=d, enable_stdp=False)
         model.create_synapse(post_id, pre_id, weight=w, delay=d, enable_stdp=False)
 
@@ -75,9 +64,9 @@ def load_network(graph, config):
         topic_id = topic_neurons[graph.paper_to_topic[paper]]
         variation_scale = 0.01 
 
-        w = config["train_to_topic_weight"]
+        w = config.train_to_topic.weight
         w *= (1.0 + np.random.normal(0, variation_scale))
-        d = int(config["train_to_topic_delay"])
+        d = int(config.train_to_topic.delay)
         model.create_synapse(paper_id, topic_id, weight=w, delay=d, enable_stdp=False)
         model.create_synapse(topic_id, paper_id, weight=w, delay=d, enable_stdp=False)
 
@@ -88,9 +77,9 @@ def load_network(graph, config):
             topic_id = topic_neurons[topic]
             variation_scale = 0.01 
 
-            w = config["validation_to_topic_weight"]
+            w = config.validation_to_topic.weight
             w *= (1.0 + np.random.normal(0, variation_scale))
-            d = int(config["validation_to_topic_delay"])
+            d = int(config.validation_to_topic.delay)
             stdp_on = True
             model.create_synapse(
                 paper_id, topic_id, weight=w, delay=d, enable_stdp=stdp_on
@@ -106,9 +95,9 @@ def load_network(graph, config):
             topic_id = topic_neurons[topic]
             variation_scale = 0.01 
 
-            w = config["test_to_topic_weight"]
+            w = config.test_to_topic.weight
             w *= (1.0 + np.random.normal(0, variation_scale))
-            d = int(config["test_to_topic_delay"])
+            d = int(config.test_to_topic.delay)
             stdp_on = True
             model.create_synapse(
                 paper_id, topic_id, weight=w, delay=d, enable_stdp=stdp_on
@@ -116,54 +105,6 @@ def load_network(graph, config):
             model.create_synapse(
                 topic_id, paper_id, weight=w, delay=d, enable_stdp=stdp_on
             )
-
-    # Connect features to paper neurons if features are enabled
-    if config["features"] == 1:
-        for node in graph.graph.nodes:
-            if (node not in graph.features.keys()):
-                print("No features for node: ", node)
-                continue
-            paper_id = paper_neurons[node]
-            for i, feature_value in enumerate(graph.features[node]):
-                if feature_value == 1:
-                    feature_id = feature_neurons[i]
-                    variation_scale = 0.01
-
-                    w = config["paper_to_feature_weight"]
-                    w *= (1.0 + np.random.normal(0, variation_scale))
-                    d = int(config["paper_to_feature_delay"])
-                    stdp_on = config["paper_to_feature_stdp"]
-                    # Adjust weights if weighted connections are enabled
-                    if config.get("paper_to_feature_weighted", False):
-                        w_paper_to_feature = (
-                            config["paper_to_feature_weight"]
-                            * graph.paper_to_features[node]
-                            / len(graph.features[node])
-                        )
-                        w_feature_to_paper = (
-                            config["feature_to_paper_weight"]
-                            * graph.feature_to_papers[i]
-                            / len(graph.features)
-                        )
-                    else:
-                        w_paper_to_feature = w
-                        w_feature_to_paper = w
-
-                    # Create synapses
-                    model.create_synapse(
-                        paper_id,
-                        feature_id,
-                        weight=w_paper_to_feature,
-                        delay=d,
-                        enable_stdp=stdp_on,
-                    )
-                    model.create_synapse(
-                        feature_id,
-                        paper_id,
-                        weight=w_feature_to_paper,
-                        delay=d,
-                        enable_stdp=stdp_on,
-                    )
 
     return model, paper_neurons, topic_neurons, feature_neurons
 
@@ -178,20 +119,20 @@ def test_paper(x):
 
     # Add a spike to the test paper neuron at time step 1 with a value sufficient to trigger a spike
     test_paper_id = paper_neurons[paper]
-    model.add_spike(0, test_paper_id, value=config.get("input_spike_value", 100.0))
+    model.add_spike(0, test_paper_id, value=config.input_spike_value)
 
     correct_topic_label = graph.paper_to_topic[paper]  # e.g. "Neural_Nets"
     correct_topic_id = topic_neurons[correct_topic_label]
     #model.add_spike(1, correct_topic_id, value=100.0)
 
     # Determine the number of time steps for STDP
-    simtime = int(config.get("simtime", 20)) 
+    simtime = int(config.simtime) 
     time_steps = int(config.get("stdp_time_steps", simtime))
 
     # Set up STDP parameters if not already set
     if not model.stdp:
-        apos_value = config.get("stdp_Apos", 0.1)
-        aneg_value = config.get("stdp_Aneg", 0.0001)
+        apos_value = config.stdp.A_pos
+        aneg_value = config.stdp.A_neg
 
         # Create lists of Apos and Aneg values with length equal to time_steps
         Apos = [apos_value] * time_steps

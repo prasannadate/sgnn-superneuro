@@ -1,10 +1,17 @@
 import argparse
+import matplotlib.pyplot as plt
+import numpy as np
 import omegaconf
 from omegaconf import DictConfig, OmegaConf
+from sklearn.metrics import confusion_matrix, classification_report
 from tabulate import tabulate
 from typing import List, Tuple, Dict, Any
 
+
 def plot_confusion_matrix(cm, labels):
+    """
+    Plot the confusion matrix 'cm' with the given 'labels'.
+    """
     fig, ax = plt.subplots()
     cax = ax.matshow(cm, cmap=plt.cm.Blues)
     fig.colorbar(cax)
@@ -22,6 +29,7 @@ def plot_confusion_matrix(cm, labels):
     plt.xlabel("Predicted")
     plt.ylabel("True")
     plt.show()
+
 
 def evaluate_predictions(graph, predictions):
     """
@@ -47,6 +55,7 @@ def evaluate_predictions(graph, predictions):
     # Optionally, plot confusion matrix:
     plot_confusion_matrix(cm, all_topics)
 
+
 def print_paper_spikes(model, paper_neurons):
     """
     Print which paper neurons spiked at each time step, 
@@ -64,7 +73,11 @@ def print_paper_spikes(model, paper_neurons):
         if spiking_papers:
             print(f"Time {t}: Paper Neurons that spiked: {spiking_papers}")
 
+
 def plot_confusion_matrix(cm, labels):
+    """
+    Plot the confusion matrix 'cm' with the given 'labels'.
+    """
     fig, ax = plt.subplots()
     cax = ax.matshow(cm, cmap=plt.cm.Blues)
     fig.colorbar(cax)
@@ -97,8 +110,8 @@ def parse_args() -> Tuple[argparse.Namespace, List[str]]:
     args, unknown_args = parser.parse_known_args()
     return args, unknown_args
 
-def print_introduction(args: argparse.Namespace, config: omegaconf.DictConfig, kwargs: Dict[str, Any], delimiter: str = "*", delimiter_width: int = 80) -> None:
 
+def print_introduction(args: argparse.Namespace, config: omegaconf.DictConfig, kwargs: Dict[str, Any], delimiter: str = "*", delimiter_width: int = 80) -> None:
     """
     Print an introduction with the default config and overridden values.
 
@@ -142,8 +155,6 @@ def print_introduction(args: argparse.Namespace, config: omegaconf.DictConfig, k
     
     print()
     print(delimiter * delimiter_width)
-
-
 
 
 def validate_overrides(loaded_config: DictConfig, argued_config: DictConfig) -> DictConfig:
