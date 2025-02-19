@@ -106,7 +106,7 @@ def parse_args() -> Tuple[argparse.Namespace, List[str]]:
         List[str]: List of unknown arguments.
     """
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", type=str, required=True, help="Path to the input config file")
+    parser.add_argument("--config", type=str, required=False, help="Path to the input config file", default="/home/ssnyde9/dev/sgnn-superneuro/configs/default_cora_bo_no_features_config.yaml")
     args, unknown_args = parser.parse_known_args()
     return args, unknown_args
 

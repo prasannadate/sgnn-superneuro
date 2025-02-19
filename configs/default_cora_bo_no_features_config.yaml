@@ -4,12 +4,13 @@ mode: validation  # Choices: ["validation", "test"]
 monitors: False
 paper_to_feature_stdp: False
 paper_to_feature_weighted: False
-processes: 8  # Adjust based on machine capabilities
+processes: 24  # Adjust based on machine capabilities
 seed: 0
 simtime: 5.0  # Choices: [5., 10., 20., 30., 40., 50., 75., 100., 150., 200.]
+
 bo:
-  num_initial_points: 10
-  max_iterations: 10
+  num_initial_points: 500
+  max_iterations: 10000
 graph:
   weight: 10.0  # Choices: [0.5, 1.0, 10.0, 100.0]
   delay: 1.0  # Choices: [1., 2., 5., 10., 20.]
@@ -37,3 +38,6 @@ validation:
 validation_to_topic:
   weight: 0.001  # Choices: [0.001, 0.005, 0.01, 0.05, 0.1]
   delay: 1.0  # Choices: [1., 2., 5., 10., 20.]
+wandb:
+  enabled: True
+  project: sgnn-superneuro-cora-bo-no-features-test
