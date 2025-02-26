@@ -1,9 +1,3 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-# In[1]:
-
-
 import sys
 from superneuromat.neuromorphicmodel import NeuromorphicModel
 import networkx as nx
@@ -11,13 +5,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import argparse
 import json
+import yaml
 from multiprocessing import Pool
-
-
-
-
-# In[2]:
-
 
 class GraphData():
     def __init__(self, name, config):
@@ -71,8 +60,6 @@ class GraphData():
                     self.topics.append(fields[1])
                 self.paper_to_topic["paper:"+fields[0]] = fields[1]
                 self.index_to_paper.append("paper:"+fields[0])
-
-
 
     def load_features(self):
         self.features = {} # keyed on paper ID, value is the feature vector
@@ -176,10 +163,6 @@ class GraphData():
         self.test_papers = test_papers
         self.validation_papers = validation_papers
 
-
-# In[3]:
-
-
 def load_network(graph, config):
     model = NeuromorphicModel()
     # Read paper to paper edge list
@@ -245,15 +228,7 @@ def load_network(graph, config):
             model.create_synapse(paper_neuron, topic_neuron, enable_stdp=True, weight=config["test_to_topic_weight"], delay=config["test_to_topic_delay"])
             model.create_synapse(topic_neuron, paper_neuron, enable_stdp=True, weight=config["test_to_topic_weight"], delay=config["test_to_topic_delay"])
 
-
-
-
     return paper_neurons, topic_neurons, model
-
-
-
-
-# In[4]:
 
 
 def test_paper(x):
@@ -295,108 +270,44 @@ def test_paper(x):
 
     return retval
 
-                #need to setup a list of zipped synapses so I can find the ids and get the weight
-                #check above where I setup synapses to get the lists to iterate over
-
-
-
-
-# In[ ]:
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description="GNN-SNN")
-    parser.add_argument("--dataset", "-d", type=str, choices=["cora", "citeseer", "pubmed"], required=True)
-    parser.add_argument("--mode", "-m", type=str, choices=["validation", "test"], required=True)
-    parser.add_argument("--seed", "-s", type=int, default=0)
-#     parser.add_argument("--features", type=int, choices=[0,1])
-    parser.add_argument("--paper_leak", type=float, default=0.0)           # [1., 10., 100., 100000.]
-    parser.add_argument("--paper_threshold", type=float, default=1.0)            # [0.25, 0.5, 0.75, 1.0, 1.5]
-    parser.add_argument("--train_ref", type=int, default=1)                 # [1.0, 5.0, 10.0, 100.0, 1000.0]
-#     parser.add_argument("--feature_ref", type=float, default=1.0)                 # [1.0, 5.0, 10.0, 100.0, 1000.0]
-    parser.add_argument("--validation_ref", type=int, default=1000)         # [1.0, 5.0, 10.0, 100.0, 1000.0]
-    parser.add_argument("--apos", type=list, default=[1.0, .5, .1, .01, .001])
-    parser.add_argument("--aneg", type=list, default=[.0001])
-    parser.add_argument("--stdp_timesteps", type=int, default=5)
+    config = yaml.safe_load(open("configs/citeseer/default_citeseer_config.yaml"))
 
-    # NOTE: We probably want to keep this parameter the same as the validation parameter above
-    parser.add_argument("--test_ref", type=int, default=1000)               # [1.0, 5.0, 10.0, 100.0, 1000.0]
-    parser.add_argument("--topic_leak", type=float, default=0.0)           # [1., 10., 100., 100000.]
-    parser.add_argument("--topic_threshold", type=float, default=1.)            # [0.25, 0.5, 0.75, 1.0, 1.5]
-#     parser.add_argument("--feature_leak", type=float, default=100000.0)         # [1., 10., 100., 100000.]
-#     parser.add_argument("--feature_threshold", type=float, default=1.0)         # [0.25, 0.5, 0.75, 1.0, 1.5]
-#     parser.add_argument("--feature_tau_minus", type=float, default=30.0)        # [5., 10., 15., 20., 25., 30., 40., 50.]
-    parser.add_argument("--graph_weight", type=float, default=100.0)            # [0.5, 1.0, 10.0, 100.0]
-    parser.add_argument("--graph_delay", type=int, default=1)               # [1., 2., 5., 10., 20.]
-    parser.add_argument("--train_to_topic_weight", type=float, default=1.0)     # [0.5, 1.0, 10.0, 100.0]
-    parser.add_argument("--train_to_topic_delay", type=int, default=1)      # [1., 2., 5., 10., 20.]
-    parser.add_argument("--validation_to_topic_weight", type=float, default=0.001)  # [0.001, 0.005, 0.01, 0.05, 0.1]
-    parser.add_argument("--validation_to_topic_delay", type=int, default=1)     # [1., 2., 5., 10., 20.]
-
-    # NOTE: We probably want to keep these parameters the same as the validation set parameters
-    parser.add_argument("--test_to_topic_weight", type=float, default=0.001)    # [0.001, 0.005, 0.01, 0.05, 0.1]
-    parser.add_argument("--test_to_topic_delay", type=int, default=1)       # [1., 2., 5., 10., 20.]
-#     parser.add_argument("--paper_to_feature_weight", type=float, default=0.2)   # [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
-#     parser.add_argument("--feature_to_paper_weight", type=float, default=0.2)   # [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
-#     parser.add_argument("--paper_to_feature_delay", type=float, default=4.0)    # [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0]
-    parser.add_argument("--simtime", type=int, default=10)                  # [5., 10., 20., 30., 40., 50. 75., 100., 150., 200.]
-#     parser.add_argument("--processes", type=int, default=4)         # Change this depending on your machine
-#     parser.add_argument("--monitors", type=str, default="False")
-#     parser.add_argument("--paper_to_feature_stdp", type=str, default="False")
-#     parser.add_argument("--paper_to_feature_weighted", type=str, default="False")
-
-
-    args = parser.parse_args()
-
-    config = vars(args)
-
-    np.random.seed(args.seed)
-    graph = GraphData(args.dataset, config)
+    np.random.seed(config["seed"])
+    graph = GraphData(config["dataset"], config)
 
     i = 0
     correct = 0
     total = 0
 
     pool = Pool(4)
-    if args.mode == "validation":
+    if config["mode"] == "validation":
         papers = []
         for paper in graph.validation_papers:
             papers.append([paper, graph, config])
         x = pool.map(test_paper, papers)
         valid_acc = np.sum(x) / len(graph.validation_papers)
         print("Validation Accuracy:", np.sum(x) / len (graph.validation_papers))
-        with open('commandline_args.json', 'a') as f:
-            accuracy = {
-                "validation_accuracy": valid_acc
-            }
-            dump_data = args.__dict__ | accuracy
-            json.dump(dump_data, f, indent=2)
+        if config["dump_json"] == 1:
+            with open('results.json', 'a') as f:
+                accuracy = {
+                    "validation_accuracy": valid_acc
+                }
+                dump_data = config | accuracy
+                json.dump(dump_data, f, indent=2)
 
-    if args.mode == "test":
+    if config["mode"] == "test":
         papers = []
         for paper in graph.test_papers:
             papers.append([paper, graph, config])
         x = pool.map(test_paper, papers)
         test_acc = np.sum(x) / len(graph.test_papers)
         print("Test Accuracy:", np.sum(x) / len (graph.test_papers))
-        with open('commandline_args.json', 'a') as f:
-            accuracy = {
-                "test_accuracy": test_acc
-            }
-            dump_data = args.__dict__ | accuracy
-            json.dump(dump_data, f, indent=2)
-
-
-# In[ ]:
-
-
-
-
-
-# In[ ]:
-
-
-#weights beyond 10.0 for the papers and topics cause a decrease
-#5.0 is the best
-#so far changing the graph weights and apos, aneg does not affect the results. The validation weight does.
-#graph weight 25.0 -> 50.0 (the current best % is 34)
-#with raising the weight of the validation synapse i got to 35.8%
+        if config["dump_json"] == 1:
+            with open('results.json', 'a') as f:
+                accuracy = {
+                    "test_accuracy": test_acc
+                }
+                dump_data = config | accuracy
+                json.dump(dump_data, f, indent=2)
