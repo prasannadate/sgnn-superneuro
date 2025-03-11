@@ -19,7 +19,10 @@ class GraphData():
         self.validation_papers = []
         self.test_papers = []
         self.load_topics()
-        self.train_val_test_split()
+        if self.name != "microseer":
+            self.train_val_test_split()
+        else:
+            self.train_val_test_split_small()
         self.load_features()
         self.load_graph()
 
@@ -38,6 +41,18 @@ class GraphData():
                 self.index_to_paper.append(fields[0])
         elif (self.name == "citeseer"):
             f = open("data/citeseer/citeseer.content", 'r')
+            lines = f.readlines()
+            f.close()
+
+            for line in lines:
+                fields = line.strip().split()
+                if (fields[-1] not in self.topics):
+                    self.topics.append(fields[-1])
+                #print(fields[0])
+                self.paper_to_topic[fields[0]] = fields[-1]
+                self.index_to_paper.append(fields[0])
+        elif (self.name == "microseer"):
+            f = open("data/microseer/microseer.content", 'r')
             lines = f.readlines()
             f.close()
 
@@ -77,6 +92,17 @@ class GraphData():
             print("NUM PAPERS WITH FEATURES: ", len(self.features.keys()))
         elif (self.name == "citeseer"):
             f = open("data/citeseer/citeseer.content", 'r')
+            lines = f.readlines()
+            f.close()
+            for line in lines:
+                fields = line.strip().split()
+                paper_id = fields[0]
+                feature = [int(x) for x in fields[1:-1]]
+                self.features[paper_id] = feature
+                self.num_features = len(feature)
+            print("NUM PAPERS WITH FEATURES: ", len(self.features.keys()))
+        elif (self.name == "microseer"):
+            f = open("data/microseer/microseer.content", 'r')
             lines = f.readlines()
             f.close()
             for line in lines:
@@ -127,6 +153,9 @@ class GraphData():
         elif (self.name == "citeseer"):
             self.graph = nx.read_edgelist("data/citeseer/citeseer.cites")
 
+        elif (self.name == "microseer"):
+            self.graph = nx.read_edgelist("data/microseer/microseer.cites")
+
         elif (self.name == "pubmed"):
             self.graph = nx.read_edgelist("data/Pubmed-Diabetes/data/edge_list.csv", delimiter=",")
 
@@ -163,6 +192,38 @@ class GraphData():
         self.test_papers = test_papers
         self.validation_papers = validation_papers
 
+    def train_val_test_split_small(self):
+        np.random.seed(self.config["seed"])
+        train_papers = []
+        test_papers = []
+        validation_papers = []
+        check_breakdown = {}
+
+        for k in self.topics:
+            check_breakdown[k] = 0
+
+        while (len(train_papers) < len(self.topics)*2):
+            index = np.random.randint(len(self.index_to_paper))
+            topic = self.paper_to_topic[self.index_to_paper[index]]
+            if (check_breakdown[topic] < 5 and self.index_to_paper[index] not in train_papers):
+                train_papers.append(self.index_to_paper[index])
+                check_breakdown[topic] += 1
+
+        while (len(validation_papers) < len(self.topics)*2):
+            index = np.random.randint(len(self.index_to_paper))
+            topic = self.paper_to_topic[self.index_to_paper[index]]
+            if (check_breakdown[topic] < 10 and self.index_to_paper[index] not in train_papers and self.index_to_paper[index] not in validation_papers):
+                validation_papers.append(self.index_to_paper[index])
+                check_breakdown[topic] += 1
+
+        for i in range(len(self.index_to_paper)):
+            if (self.index_to_paper[i] not in train_papers and self.index_to_paper[i] not in validation_papers and self.index_to_paper[i] in self.paper_to_topic.keys()):
+                test_papers.append(self.index_to_paper[i])
+
+        self.train_papers = train_papers
+        self.test_papers = test_papers
+        self.validation_papers = validation_papers
+
 def load_network(graph, config):
     model = NeuromorphicModel()
     # Read paper to paper edge list
@@ -171,7 +232,13 @@ def load_network(graph, config):
     paper_neurons = {}
     i = 0
     variation_scale = .01
+    print(graph.graph.nodes)
+#     print("training papers ")
+#     print(graph.train_papers)
+#     print("validation papers ")
+#     print(graph.validation_papers)
     for node in graph.graph.nodes:
+        print(node)
         if (node not in graph.paper_to_topic.keys()):
             continue
         if node in graph.train_papers:
@@ -272,7 +339,7 @@ def test_paper(x):
 
 
 if __name__ == '__main__':
-    config = yaml.safe_load(open("configs/citeseer/default_citeseer_config.yaml"))
+    config = yaml.safe_load(open("configs/citeseer/default_microseer_config.yaml"))
 
     np.random.seed(config["seed"])
     graph = GraphData(config["dataset"], config)
