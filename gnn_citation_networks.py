@@ -60,7 +60,7 @@ class GraphData():
                 fields = line.strip().split()
                 if (fields[-1] not in self.topics):
                     self.topics.append(fields[-1])
-                #print(fields[0])
+#                 print(fields[0])
                 self.paper_to_topic[fields[0]] = fields[-1]
                 self.index_to_paper.append(fields[0])
         elif (self.name == "pubmed"):
@@ -188,6 +188,8 @@ class GraphData():
             if (self.index_to_paper[i] not in train_papers and self.index_to_paper[i] not in validation_papers and self.index_to_paper[i] in self.paper_to_topic.keys()):
                 test_papers.append(self.index_to_paper[i])
 
+
+        print(len(test_papers))
         self.train_papers = train_papers
         self.test_papers = test_papers
         self.validation_papers = validation_papers
@@ -205,14 +207,14 @@ class GraphData():
         while (len(train_papers) < len(self.topics)*2):
             index = np.random.randint(len(self.index_to_paper))
             topic = self.paper_to_topic[self.index_to_paper[index]]
-            if (check_breakdown[topic] < 5 and self.index_to_paper[index] not in train_papers):
+            if (check_breakdown[topic] < 8 and self.index_to_paper[index] not in train_papers):
                 train_papers.append(self.index_to_paper[index])
                 check_breakdown[topic] += 1
 
-        while (len(validation_papers) < len(self.topics)*2):
+        while (len(validation_papers) < len(self.topics)*5):
             index = np.random.randint(len(self.index_to_paper))
             topic = self.paper_to_topic[self.index_to_paper[index]]
-            if (check_breakdown[topic] < 10 and self.index_to_paper[index] not in train_papers and self.index_to_paper[index] not in validation_papers):
+            if (check_breakdown[topic] < 16 and self.index_to_paper[index] not in train_papers and self.index_to_paper[index] not in validation_papers):
                 validation_papers.append(self.index_to_paper[index])
                 check_breakdown[topic] += 1
 
@@ -238,7 +240,6 @@ def load_network(graph, config):
 #     print("validation papers ")
 #     print(graph.validation_papers)
     for node in graph.graph.nodes:
-        print(node)
         if (node not in graph.paper_to_topic.keys()):
             continue
         if node in graph.train_papers:
@@ -266,6 +267,8 @@ def load_network(graph, config):
         model.create_synapse(post, pre, weight=config["graph_weight"], delay=config["graph_delay"], enable_stdp=False)
 
     for paper in graph.train_papers:
+        if paper not in paper_neurons:
+            continue
         paper_neuron = paper_neurons[paper]
         topic_neuron = topic_neurons[graph.paper_to_topic[paper]]
         train_to_topic_w = 1.0
@@ -276,6 +279,8 @@ def load_network(graph, config):
 
     for paper in graph.validation_papers:
         for topic in graph.topics:
+            if paper not in paper_neurons:
+                continue
             paper_neuron = paper_neurons[paper]
             topic_neuron = topic_neurons[topic]
 
@@ -287,6 +292,8 @@ def load_network(graph, config):
 
     for paper in graph.test_papers:
         for topic in graph.topics:
+            if paper not in paper_neurons:
+                continue
             paper_neuron = paper_neurons[paper]
             topic_neuron = topic_neurons[topic]
             test_to_topic_w = 0.001
@@ -339,7 +346,7 @@ def test_paper(x):
 
 
 if __name__ == '__main__':
-    config = yaml.safe_load(open("configs/citeseer/default_microseer_config.yaml"))
+    config = yaml.safe_load(open("configs/pubmed/default_pubmed_config.yaml"))
 
     np.random.seed(config["seed"])
     graph = GraphData(config["dataset"], config)
@@ -347,34 +354,41 @@ if __name__ == '__main__':
     i = 0
     correct = 0
     total = 0
+    x = 0
+    for paper in graph.validation_papers:
+        if paper not in graph.graph.nodes:
+            continue
+        x += test_paper([paper, graph, config])
 
-    pool = Pool(4)
-    if config["mode"] == "validation":
-        papers = []
-        for paper in graph.validation_papers:
-            papers.append([paper, graph, config])
-        x = pool.map(test_paper, papers)
-        valid_acc = np.sum(x) / len(graph.validation_papers)
-        print("Validation Accuracy:", np.sum(x) / len (graph.validation_papers))
-        if config["dump_json"] == 1:
-            with open('results.json', 'a') as f:
-                accuracy = {
-                    "validation_accuracy": valid_acc
-                }
-                dump_data = config | accuracy
-                json.dump(dump_data, f, indent=2)
+    print("validation acc:", x / len (graph.validation_papers))
 
-    if config["mode"] == "test":
-        papers = []
-        for paper in graph.test_papers:
-            papers.append([paper, graph, config])
-        x = pool.map(test_paper, papers)
-        test_acc = np.sum(x) / len(graph.test_papers)
-        print("Test Accuracy:", np.sum(x) / len (graph.test_papers))
-        if config["dump_json"] == 1:
-            with open('results.json', 'a') as f:
-                accuracy = {
-                    "test_accuracy": test_acc
-                }
-                dump_data = config | accuracy
-                json.dump(dump_data, f, indent=2)
+#     pool = Pool(4)
+#     if config["mode"] == "validation":
+#         papers = []
+#         for paper in graph.validation_papers:
+#             papers.append([paper, graph, config])
+#         x = pool.map(test_paper, papers)
+#         valid_acc = np.sum(x) / len(graph.validation_papers)
+#         print("Validation Accuracy:", np.sum(x) / len (graph.validation_papers))
+#         if config["dump_json"] == 1:
+#             with open('results.json', 'a') as f:
+#                 accuracy = {
+#                     "validation_accuracy": valid_acc
+#                 }
+#                 dump_data = config | accuracy
+#                 json.dump(dump_data, f, indent=2)
+
+#     if config["mode"] == "test":
+#         papers = []
+#         for paper in graph.test_papers:
+#             papers.append([paper, graph, config])
+#         x = pool.map(test_paper, papers)
+#         test_acc = np.sum(x) / len(graph.test_papers)
+#         print("Test Accuracy:", np.sum(x) / len (graph.test_papers))
+#         if config["dump_json"] == 1:
+#             with open('results.json', 'a') as f:
+#                 accuracy = {
+#                     "test_accuracy": test_acc
+#                 }
+#                 dump_data = config | accuracy
+#                 json.dump(dump_data, f, indent=2)
