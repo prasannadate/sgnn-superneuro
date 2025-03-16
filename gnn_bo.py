@@ -14,6 +14,7 @@ from lmao.solver import BOSolver
 from superneuromat.neuromorphicmodel import NeuromorphicModel
 
 # local imports
+from .gnn_citation_networks import GraphData, test_paper
 from graph_data import GraphData
 from sgnn import (
     test_paper,
