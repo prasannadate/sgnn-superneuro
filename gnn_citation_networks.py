@@ -232,6 +232,7 @@ def load_network(graph, config):
     paper_neurons = {}
     i = 0
     variation_scale = .01
+
     for node in graph.graph.nodes:
         if (node not in graph.paper_to_topic.keys()):
             continue
@@ -292,16 +293,18 @@ def load_network(graph, config):
     return paper_neurons, topic_neurons, model
 
 
-def test_paper(x):
+def test_paper(x, verbose: bool = False):
     paper =  x[0]
     graph =  x[1]
     config = x[2]
+
     paper_neurons, topic_neurons, model = load_network(graph, config)
     paper_id = paper_neurons[paper]
     model.add_spike(0, paper_id, 100.0)
     timesteps = config["simtime"]
     model.stdp_setup(time_steps=config["stdp_timesteps"],
         Apos=config["apos"], Aneg=config["aneg"] * config["stdp_timesteps"], negative_update=True, positive_update=True)
+
     model.setup()
     model.simulate(time_steps=timesteps)
     min_weight = -1000
@@ -316,7 +319,10 @@ def test_paper(x):
         if synapse_indices:
             idx = synapse_indices
             weight = model.synaptic_weights[idx]
-            print(f"Topic: {topic_id}, Paper: {paper}, Weight: {weight}")
+            
+            if verbose:
+                print(f"Topic: {topic_id}, Paper: {paper}, Weight: {weight}")
+            
             if weight > min_weight:
                 min_weight = weight
                 min_topic = topic_id
@@ -324,10 +330,11 @@ def test_paper(x):
 
     actual_topic = graph.paper_to_topic[paper]
     retval = 1 if actual_topic == min_topic else 0
-    if retval == 1:
-        print(f"MIN VAL for {paper} Topic {min_topic} CORRECT")
-    else:
-        print(f"MIN VAL for {paper} Topic {min_topic} WRONG, Expected {actual_topic}")
+    if verbose:
+        if retval == 1:
+            print(f"MIN VAL for {paper} Topic {min_topic} CORRECT")
+        else:
+            print(f"MIN VAL for {paper} Topic {min_topic} WRONG, Expected {actual_topic}")
 
     return retval
 
