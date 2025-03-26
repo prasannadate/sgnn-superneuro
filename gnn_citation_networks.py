@@ -63,6 +63,18 @@ class GraphData():
                 #print(fields[0])
                 self.paper_to_topic[fields[0]] = fields[-1]
                 self.index_to_paper.append(fields[0])
+        elif (self.name == "miniseer"):
+            f = open("data/miniseer/miniseer.content", 'r')
+            lines = f.readlines()
+            f.close()
+
+            for line in lines:
+                fields = line.strip().split()
+                if (fields[-1] not in self.topics):
+                    self.topics.append(fields[-1])
+                #print(fields[0])
+                self.paper_to_topic[fields[0]] = fields[-1]
+                self.index_to_paper.append(fields[0])
         elif (self.name == "pubmed"):
             f = open("data/Pubmed-Diabetes/data/Pubmed-Diabetes.NODE.paper.tab", 'r')
             lines = f.readlines()
@@ -103,6 +115,17 @@ class GraphData():
             print("NUM PAPERS WITH FEATURES: ", len(self.features.keys()))
         elif (self.name == "microseer"):
             f = open("data/microseer/microseer.content", 'r')
+            lines = f.readlines()
+            f.close()
+            for line in lines:
+                fields = line.strip().split()
+                paper_id = fields[0]
+                feature = [int(x) for x in fields[1:-1]]
+                self.features[paper_id] = feature
+                self.num_features = len(feature)
+            print("NUM PAPERS WITH FEATURES: ", len(self.features.keys()))
+        elif (self.name == "miniseer"):
+            f = open("data/miniseer/miniseer.content", 'r')
             lines = f.readlines()
             f.close()
             for line in lines:
@@ -156,6 +179,9 @@ class GraphData():
         elif (self.name == "microseer"):
             self.graph = nx.read_edgelist("data/microseer/microseer.cites")
 
+        elif (self.name == "miniseer"):
+            self.graph = nx.read_edgelist("data/miniseer/miniseer.cites")
+
         elif (self.name == "pubmed"):
             self.graph = nx.read_edgelist("data/Pubmed-Diabetes/data/edge_list.csv", delimiter=",")
 
@@ -202,17 +228,17 @@ class GraphData():
         for k in self.topics:
             check_breakdown[k] = 0
 
-        while (len(train_papers) < len(self.topics)*2):
+        while (len(train_papers) < len(self.topics)*5):
             index = np.random.randint(len(self.index_to_paper))
             topic = self.paper_to_topic[self.index_to_paper[index]]
-            if (check_breakdown[topic] < 5 and self.index_to_paper[index] not in train_papers):
+            if (check_breakdown[topic] < 10 and self.index_to_paper[index] not in train_papers):
                 train_papers.append(self.index_to_paper[index])
                 check_breakdown[topic] += 1
 
-        while (len(validation_papers) < len(self.topics)*2):
+        while (len(validation_papers) < len(self.topics)*5):
             index = np.random.randint(len(self.index_to_paper))
             topic = self.paper_to_topic[self.index_to_paper[index]]
-            if (check_breakdown[topic] < 10 and self.index_to_paper[index] not in train_papers and self.index_to_paper[index] not in validation_papers):
+            if (check_breakdown[topic] < 20 and self.index_to_paper[index] not in train_papers and self.index_to_paper[index] not in validation_papers):
                 validation_papers.append(self.index_to_paper[index])
                 check_breakdown[topic] += 1
 
@@ -316,7 +342,7 @@ def test_paper(x):
         if synapse_indices:
             idx = synapse_indices
             weight = model.synaptic_weights[idx]
-            print(f"Topic: {topic_id}, Paper: {paper}, Weight: {weight}")
+#             print(f"Topic: {topic_id}, Paper: {paper}, Weight: {weight}")
             if weight > min_weight:
                 min_weight = weight
                 min_topic = topic_id
@@ -324,16 +350,16 @@ def test_paper(x):
 
     actual_topic = graph.paper_to_topic[paper]
     retval = 1 if actual_topic == min_topic else 0
-    if retval == 1:
-        print(f"MIN VAL for {paper} Topic {min_topic} CORRECT")
-    else:
-        print(f"MIN VAL for {paper} Topic {min_topic} WRONG, Expected {actual_topic}")
+#     if retval == 1:
+#         print(f"MIN VAL for {paper} Topic {min_topic} CORRECT")
+#     else:
+#         print(f"MIN VAL for {paper} Topic {min_topic} WRONG, Expected {actual_topic}")
 
     return retval
 
 
 if __name__ == '__main__':
-    config = yaml.safe_load(open("configs/cora/apos_cora_config.yaml"))
+    config = yaml.safe_load(open("configs/microseer/default_microseer_config.yaml"))
 
     np.random.seed(config["seed"])
     graph = GraphData(config["dataset"], config)

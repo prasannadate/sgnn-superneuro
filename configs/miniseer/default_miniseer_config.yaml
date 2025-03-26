@@ -1,6 +1,6 @@
-dataset: microseer  # Choices: ["cora", "citeseer", "pubmed", "microseer"]
-mode: test  # Choices: ["validation", "test"]
-seed: 120
+dataset: miniseer  # Choices: ["cora", "citeseer", "pubmed", "microseer", "miniseer"]
+mode: validation  # Choices: ["validation", "test"]
+seed: 0
 features: 0  # Choices: [0,1]
 paper_leak: 0.0  # Choices: [1., 10., 100., 100000.]
 paper_threshold: 1.0  # Choices: [0.25, 0.5, 0.75, 1.0, 1.5]
