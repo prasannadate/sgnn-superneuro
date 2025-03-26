@@ -4,7 +4,9 @@ networkx<=2.8.7
 numpy<2.0.0,>=1.24.4
 asteval<0.10,>=0.9.31
 omegaconf
+pandas
 scikit-learn
+scikit-optimize
 superneuromat
 tabulate
 wandb
