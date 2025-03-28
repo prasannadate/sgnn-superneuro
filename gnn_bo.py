@@ -42,7 +42,8 @@ def solve_gnn(arg1, arg2, arg3, arg4,
         "validation_to_topic_weight": float(arg7),
         "test_to_topic_weight": float(arg7),
         "apos": [float(x) for x in [arg8, arg9, arg10, arg11, arg12]],
-        "aneg": [float(arg13)]
+        "aneg": [float(arg13)],
+        "mode": "validation"
     })
 
     # print("Override config:")
@@ -76,7 +77,7 @@ def solve_gnn(arg1, arg2, arg3, arg4,
         with Pool(local_config["processes"]) as pool:
             if local_config["mode"] == "validation":
                 iterator = graph.validation_papers
-            elif local_config["mode"] == "testing":
+            elif local_config["mode"] == "test":
                 iterator = graph.test_papers
             
             for paper in iterator:

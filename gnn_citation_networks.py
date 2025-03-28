@@ -349,7 +349,7 @@ if __name__ == '__main__':
     correct = 0
     total = 0
 
-    pool = Pool(4)
+    pool = Pool(config["processes"])
     if config["mode"] == "validation":
         papers = []
         for paper in graph.validation_papers:
