@@ -6,30 +6,33 @@ import matplotlib.pyplot as plt
 import argparse
 import json
 import yaml
+import pathlib as pl
 from multiprocessing import Pool
+
+wd = pl.Path(__file__).parent.absolute()
+
 
 class GraphData():
     def __init__(self, name, config):
         self.name = name
         self.config = config
-        self.paper_to_topic = {} # maps the paper ID in the dataset to its topic ID
+        self.paper_to_topic = {}  # maps the paper ID in the dataset to its topic ID
         self.index_to_paper = []    # creates an index for each paper
         self.topics = []            # the list of topics
         self.train_papers = []
         self.validation_papers = []
         self.test_papers = []
         self.load_topics()
-        if self.name != "microseer":
-            self.train_val_test_split()
-        else:
+        if self.name == "microseer":
             self.train_val_test_split_small()
+        else:
+            self.train_val_test_split()
         self.load_features()
         self.load_graph()
 
-
     def load_topics(self):
         if (self.name == "cora"):
-            f = open("data/Cora/group-edges.csv", 'r')
+            f = open(wd / "data/Cora/group-edges.csv", 'r')
             lines = f.readlines()
             f.close()
 
@@ -40,7 +43,7 @@ class GraphData():
                 self.paper_to_topic[fields[0]] = fields[1]
                 self.index_to_paper.append(fields[0])
         elif (self.name == "citeseer"):
-            f = open("data/citeseer/citeseer.content", 'r')
+            f = open(wd / "data/citeseer/citeseer.content", 'r')
             lines = f.readlines()
             f.close()
 
@@ -48,11 +51,11 @@ class GraphData():
                 fields = line.strip().split()
                 if (fields[-1] not in self.topics):
                     self.topics.append(fields[-1])
-                #print(fields[0])
+                # print(fields[0])
                 self.paper_to_topic[fields[0]] = fields[-1]
                 self.index_to_paper.append(fields[0])
         elif (self.name == "microseer"):
-            f = open("data/microseer/microseer.content", 'r')
+            f = open(wd / "data/microseer/microseer.content", 'r')
             lines = f.readlines()
             f.close()
 
@@ -60,11 +63,11 @@ class GraphData():
                 fields = line.strip().split()
                 if (fields[-1] not in self.topics):
                     self.topics.append(fields[-1])
-                #print(fields[0])
+                # print(fields[0])
                 self.paper_to_topic[fields[0]] = fields[-1]
                 self.index_to_paper.append(fields[0])
         elif (self.name == "miniseer"):
-            f = open("data/miniseer/miniseer.content", 'r')
+            f = open(wd / "data/miniseer/miniseer.content", 'r')
             lines = f.readlines()
             f.close()
 
@@ -72,11 +75,11 @@ class GraphData():
                 fields = line.strip().split()
                 if (fields[-1] not in self.topics):
                     self.topics.append(fields[-1])
-                #print(fields[0])
+                # print(fields[0])
                 self.paper_to_topic[fields[0]] = fields[-1]
                 self.index_to_paper.append(fields[0])
         elif (self.name == "pubmed"):
-            f = open("data/Pubmed-Diabetes/data/Pubmed-Diabetes.NODE.paper.tab", 'r')
+            f = open(wd / "data/Pubmed-Diabetes/data/Pubmed-Diabetes.NODE.paper.tab", 'r')
             lines = f.readlines()
             f.close()
             lines = lines[2:]
@@ -85,13 +88,13 @@ class GraphData():
                 fields = line.strip().split()
                 if (fields[1] not in self.topics):
                     self.topics.append(fields[1])
-                self.paper_to_topic["paper:"+fields[0]] = fields[1]
-                self.index_to_paper.append("paper:"+fields[0])
+                self.paper_to_topic["paper:" + fields[0]] = fields[1]
+                self.index_to_paper.append("paper:" + fields[0])
 
     def load_features(self):
-        self.features = {} # keyed on paper ID, value is the feature vector
+        self.features = {}  # keyed on paper ID, value is the feature vector
         if (self.name == "cora"):
-            f = open("data/Cora/cora/cora.content", 'r')
+            f = open(wd / "data/Cora/cora/cora.content", 'r')
             lines = f.readlines()
             f.close()
 
@@ -103,7 +106,7 @@ class GraphData():
                 self.num_features = len(feature)
             print("NUM PAPERS WITH FEATURES: ", len(self.features.keys()))
         elif (self.name == "citeseer"):
-            f = open("data/citeseer/citeseer.content", 'r')
+            f = open(wd / "data/citeseer/citeseer.content", 'r')
             lines = f.readlines()
             f.close()
             for line in lines:
@@ -114,7 +117,7 @@ class GraphData():
                 self.num_features = len(feature)
             print("NUM PAPERS WITH FEATURES: ", len(self.features.keys()))
         elif (self.name == "microseer"):
-            f = open("data/microseer/microseer.content", 'r')
+            f = open(wd / "data/microseer/microseer.content", 'r')
             lines = f.readlines()
             f.close()
             for line in lines:
@@ -125,7 +128,7 @@ class GraphData():
                 self.num_features = len(feature)
             print("NUM PAPERS WITH FEATURES: ", len(self.features.keys()))
         elif (self.name == "miniseer"):
-            f = open("data/miniseer/miniseer.content", 'r')
+            f = open(wd / "data/miniseer/miniseer.content", 'r')
             lines = f.readlines()
             f.close()
             for line in lines:
@@ -134,7 +137,7 @@ class GraphData():
                 feature = [int(x) for x in fields[1:-1]]
                 self.features[paper_id] = feature
                 self.num_features = len(feature)
-            print("NUM PAPERS WITH FEATURES: ", len(self.features.keys()))
+            print(wd / "NUM PAPERS WITH FEATURES: ", len(self.features.keys()))
         elif (self.name == "pubmed"):
             f = open("data/Pubmed-Diabetes/data/Pubmed-Diabetes.NODE.paper.tab", 'r')
             lines = f.readlines()
@@ -150,7 +153,7 @@ class GraphData():
             self.num_features = len(all_features.keys())
             lines = lines[2:]
             for line in lines:
-                feature = [0]*self.num_features
+                feature = [0] * self.num_features
                 fields = line.split()
                 paper_id = "paper:" + fields[0]
                 xfields = fields[-1].split('=')
@@ -159,8 +162,8 @@ class GraphData():
                     feature[all_features[x]] = 1
                 self.features[paper_id] = feature
 
-        self.paper_to_features = {} # keyed on paper ID, value is the number of features it has
-        self.feature_to_papers = {} # keyed on feature ID, value is the number of papers that have that feature
+        self.paper_to_features = {}  # keyed on paper ID, value is the number of features it has
+        self.feature_to_papers = {}  # keyed on feature ID, value is the number of papers that have that feature
         for p in self.features.keys():
             self.paper_to_features[p] = np.sum(self.features[p])
             for i in range(len(self.features[p])):
@@ -168,23 +171,21 @@ class GraphData():
                     self.feature_to_papers[i] = 0
                 self.feature_to_papers[i] += self.features[p][i]
 
-
     def load_graph(self):
         if (self.name == "cora"):
-            self.graph = nx.read_edgelist("data/Cora/edges.csv", delimiter=",")
+            self.graph = nx.read_edgelist(wd / "data/Cora/edges.csv", delimiter=",")
 
         elif (self.name == "citeseer"):
-            self.graph = nx.read_edgelist("data/citeseer/citeseer.cites")
+            self.graph = nx.read_edgelist(wd / "data/citeseer/citeseer.cites")
 
         elif (self.name == "microseer"):
-            self.graph = nx.read_edgelist("data/microseer/microseer.cites")
+            self.graph = nx.read_edgelist(wd / "data/microseer/microseer.cites")
 
         elif (self.name == "miniseer"):
-            self.graph = nx.read_edgelist("data/miniseer/miniseer.cites")
+            self.graph = nx.read_edgelist(wd / "data/miniseer/miniseer.cites")
 
         elif (self.name == "pubmed"):
-            self.graph = nx.read_edgelist("data/Pubmed-Diabetes/data/edge_list.csv", delimiter=",")
-
+            self.graph = nx.read_edgelist(wd / "data/Pubmed-Diabetes/data/edge_list.csv", delimiter=",")
 
     def train_val_test_split(self):
         np.random.seed(self.config["seed"])
@@ -196,14 +197,14 @@ class GraphData():
         for k in self.topics:
             check_breakdown[k] = 0
 
-        while (len(train_papers) < len(self.topics)*20):
+        while (len(train_papers) < len(self.topics) * 20):
             index = np.random.randint(len(self.index_to_paper))
             topic = self.paper_to_topic[self.index_to_paper[index]]
             if (check_breakdown[topic] < 20 and self.index_to_paper[index] not in train_papers):
                 train_papers.append(self.index_to_paper[index])
                 check_breakdown[topic] += 1
 
-        while (len(validation_papers) < len(self.topics)*20):
+        while (len(validation_papers) < len(self.topics) * 20):
             index = np.random.randint(len(self.index_to_paper))
             topic = self.paper_to_topic[self.index_to_paper[index]]
             if (check_breakdown[topic] < 40 and self.index_to_paper[index] not in train_papers and self.index_to_paper[index] not in validation_papers):
@@ -228,14 +229,14 @@ class GraphData():
         for k in self.topics:
             check_breakdown[k] = 0
 
-        while (len(train_papers) < len(self.topics)*5):
+        while (len(train_papers) < len(self.topics) * 5):
             index = np.random.randint(len(self.index_to_paper))
             topic = self.paper_to_topic[self.index_to_paper[index]]
             if (check_breakdown[topic] < 10 and self.index_to_paper[index] not in train_papers):
                 train_papers.append(self.index_to_paper[index])
                 check_breakdown[topic] += 1
 
-        while (len(validation_papers) < len(self.topics)*5):
+        while (len(validation_papers) < len(self.topics) * 5):
             index = np.random.randint(len(self.index_to_paper))
             topic = self.paper_to_topic[self.index_to_paper[index]]
             if (check_breakdown[topic] < 20 and self.index_to_paper[index] not in train_papers and self.index_to_paper[index] not in validation_papers):
@@ -249,6 +250,7 @@ class GraphData():
         self.train_papers = train_papers
         self.test_papers = test_papers
         self.validation_papers = validation_papers
+
 
 def load_network(graph, config):
     model = snm.NeuromorphicModel()
@@ -268,10 +270,11 @@ def load_network(graph, config):
         elif node in graph.test_papers:
             neuron = model.create_neuron(threshold=config["paper_threshold"], leak=config["paper_leak"], refractory_period=config["test_ref"])
         paper_neurons[node] = neuron
-
+        # paper_neurons[node] = neuron.idx
 
     for t in graph.topics:
         neuron = model.create_neuron(threshold=config["topic_threshold"], leak=config["topic_leak"], refractory_period=0)
+        # topic_neurons[t] = neuron.idx
         topic_neurons[t] = neuron
 
     for edge in graph.graph.edges:
@@ -319,9 +322,7 @@ def load_network(graph, config):
 
 
 def test_paper(x):
-    paper =  x[0]
-    graph =  x[1]
-    config = x[2]
+    paper, graph, config = x
     paper_neurons, topic_neurons, model = load_network(graph, config)
     paper_id = paper_neurons[paper]
     model.add_spike(0, paper_id, 100.0)
@@ -347,7 +348,6 @@ def test_paper(x):
                 min_weight = weight
                 min_topic = topic_id
 
-
     actual_topic = graph.paper_to_topic[paper]
     retval = 1 if actual_topic == min_topic else 0
 #     if retval == 1:
@@ -359,7 +359,7 @@ def test_paper(x):
 
 
 if __name__ == '__main__':
-    config = yaml.safe_load(open("configs/microseer/default_microseer_config.yaml"))
+    config = yaml.safe_load(open(wd / "configs/miniseer/default_miniseer_config.yaml"))
 
     np.random.seed(config["seed"])
     graph = GraphData(config["dataset"], config)
@@ -375,7 +375,7 @@ if __name__ == '__main__':
             papers.append([paper, graph, config])
         x = pool.map(test_paper, papers)
         valid_acc = np.sum(x) / len(graph.validation_papers)
-        print("Validation Accuracy:", np.sum(x) / len (graph.validation_papers))
+        print("Validation Accuracy:", np.sum(x) / len(graph.validation_papers))
         if config["dump_json"] == 1:
             with open('results.json', 'a') as f:
                 accuracy = {
@@ -390,7 +390,7 @@ if __name__ == '__main__':
             papers.append([paper, graph, config])
         x = pool.map(test_paper, papers)
         test_acc = np.sum(x) / len(graph.test_papers)
-        print("Test Accuracy:", np.sum(x) / len (graph.test_papers))
+        print("Test Accuracy:", np.sum(x) / len(graph.test_papers))
         if config["dump_json"] == 1:
             with open('results.json', 'a') as f:
                 accuracy = {
