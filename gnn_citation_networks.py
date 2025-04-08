@@ -1,11 +1,12 @@
 import sys
-from superneuromat.neuromorphicmodel import NeuromorphicModel
+import superneuromat
 import networkx as nx
 import numpy as np
 import matplotlib.pyplot as plt
 import argparse
 import json
 import yaml
+import pickle
 from multiprocessing import Pool
 
 class GraphData():
@@ -189,7 +190,7 @@ class GraphData():
                 test_papers.append(self.index_to_paper[i])
 
 
-        print(len(test_papers))
+#         print(len(test_papers))
         self.train_papers = train_papers
         self.test_papers = test_papers
         self.validation_papers = validation_papers
@@ -227,14 +228,14 @@ class GraphData():
         self.validation_papers = validation_papers
 
 def load_network(graph, config):
-    model = NeuromorphicModel()
+    model = superneuromat.NeuromorphicModel()
     # Read paper to paper edge list
     topic_neurons = {}
     # Create paper neurons
     paper_neurons = {}
     i = 0
     variation_scale = .01
-    print(graph.graph.nodes)
+#     print(graph.graph.nodes)
 #     print("training papers ")
 #     print(graph.train_papers)
 #     print("validation papers ")
@@ -263,8 +264,8 @@ def load_network(graph, config):
         graph_weight = 100.0
         variations = (1.0 + np.random.normal(0, variation_scale))
         graph_delay = 1
-        model.create_synapse(pre, post, weight=config["graph_weight"], delay=config["graph_delay"], enable_stdp=False)
-        model.create_synapse(post, pre, weight=config["graph_weight"], delay=config["graph_delay"], enable_stdp=False)
+        model.create_synapse(pre, post, weight=config["graph_weight"], delay=config["graph_delay"], stdp_enabled=False)
+        model.create_synapse(post, pre, weight=config["graph_weight"], delay=config["graph_delay"], stdp_enabled=False)
 
     for paper in graph.train_papers:
         if paper not in paper_neurons:
@@ -274,8 +275,8 @@ def load_network(graph, config):
         train_to_topic_w = 1.0
         train_to_topic_w *= (1.0 + np.random.normal(0, variation_scale))
         train_to_topic_d = 1
-        model.create_synapse(paper_neuron, topic_neuron, weight=config["train_to_topic_weight"], delay=config["train_to_topic_delay"], enable_stdp=False)
-        model.create_synapse(topic_neuron, paper_neuron, weight=config["train_to_topic_weight"], delay=config["train_to_topic_delay"], enable_stdp=False)
+        model.create_synapse(paper_neuron, topic_neuron, weight=config["train_to_topic_weight"], delay=config["train_to_topic_delay"], stdp_enabled=False)
+        model.create_synapse(topic_neuron, paper_neuron, weight=config["train_to_topic_weight"], delay=config["train_to_topic_delay"], stdp_enabled=False)
 
     for paper in graph.validation_papers:
         for topic in graph.topics:
@@ -287,8 +288,8 @@ def load_network(graph, config):
             validation_to_topic_w = 0.001
             validation_to_topic_w *= (1.0 + np.random.normal(0, variation_scale))
             validation_to_topic_d = 1
-            model.create_synapse(paper_neuron, topic_neuron, enable_stdp=True, weight=config["validation_to_topic_weight"], delay=config["validation_to_topic_delay"])
-            model.create_synapse(topic_neuron, paper_neuron, enable_stdp=True, weight=config["validation_to_topic_weight"], delay=config["validation_to_topic_delay"])
+            model.create_synapse(paper_neuron, topic_neuron, stdp_enabled=True, weight=config["validation_to_topic_weight"], delay=config["validation_to_topic_delay"])
+            model.create_synapse(topic_neuron, paper_neuron, stdp_enabled=True, weight=config["validation_to_topic_weight"], delay=config["validation_to_topic_delay"])
 
     for paper in graph.test_papers:
         for topic in graph.topics:
@@ -299,8 +300,8 @@ def load_network(graph, config):
             test_to_topic_w = 0.001
             test_to_topic_w *= (1.0 + np.random.normal(0, variation_scale))
             test_to_topic_d = 1
-            model.create_synapse(paper_neuron, topic_neuron, enable_stdp=True, weight=config["test_to_topic_weight"], delay=config["test_to_topic_delay"])
-            model.create_synapse(topic_neuron, paper_neuron, enable_stdp=True, weight=config["test_to_topic_weight"], delay=config["test_to_topic_delay"])
+            model.create_synapse(paper_neuron, topic_neuron, stdp_enabled=True, weight=config["test_to_topic_weight"], delay=config["test_to_topic_delay"])
+            model.create_synapse(topic_neuron, paper_neuron, stdp_enabled=True, weight=config["test_to_topic_weight"], delay=config["test_to_topic_delay"])
 
     return paper_neurons, topic_neurons, model
 
@@ -316,7 +317,11 @@ def test_paper(x):
     model.stdp_setup(time_steps=config["stdp_timesteps"],
         Apos=config["apos"], Aneg=config["aneg"] * config["stdp_timesteps"], negative_update=True, positive_update=True)
     model.setup()
+    with open("pre_sim_model.pkl", "wb") as f:
+        pickle.dump(model, f)
     model.simulate(time_steps=timesteps)
+    with open("post_sim_model.pkl", "wb") as f:
+        pickle.dump(model, f)
     min_weight = -1000
 
     # Analyze the weights between the test paper neuron and topic neurons
@@ -346,7 +351,7 @@ def test_paper(x):
 
 
 if __name__ == '__main__':
-    config = yaml.safe_load(open("configs/pubmed/default_pubmed_config.yaml"))
+    config = yaml.safe_load(open("configs/microseer/default_microseer_config.yaml"))
 
     np.random.seed(config["seed"])
     graph = GraphData(config["dataset"], config)
@@ -355,10 +360,12 @@ if __name__ == '__main__':
     correct = 0
     total = 0
     x = 0
+
     for paper in graph.validation_papers:
         if paper not in graph.graph.nodes:
             continue
         x += test_paper([paper, graph, config])
+        exit()
 
     print("validation acc:", x / len (graph.validation_papers))
 
