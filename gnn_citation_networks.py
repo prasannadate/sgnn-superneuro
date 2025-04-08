@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import argparse
 import json
 import yaml
+import pickle
 from multiprocessing import Pool
 
 class GraphData():
@@ -329,7 +330,11 @@ def test_paper(x):
     model.stdp_setup(time_steps=config["stdp_timesteps"],
         Apos=config["apos"], Aneg=config["aneg"] * config["stdp_timesteps"], negative_update=True, positive_update=True)
     model.setup()
+    with open("pre_sim_model.pkl", "wb") as f:
+        pickle.dump(model, f)
     model.simulate(time_steps=timesteps)
+    with open("post_sim_model.pkl", "wb") as f:
+        pickle.dump(model, f)
     min_weight = -1000
 
     # Analyze the weights between the test paper neuron and topic neurons
@@ -350,10 +355,10 @@ def test_paper(x):
 
     actual_topic = graph.paper_to_topic[paper]
     retval = 1 if actual_topic == min_topic else 0
-#     if retval == 1:
-#         print(f"MIN VAL for {paper} Topic {min_topic} CORRECT")
-#     else:
-#         print(f"MIN VAL for {paper} Topic {min_topic} WRONG, Expected {actual_topic}")
+    if retval == 1:
+        print(f"MIN VAL for {paper} Topic {min_topic} CORRECT")
+    else:
+        print(f"MIN VAL for {paper} Topic {min_topic} WRONG, Expected {actual_topic}")
 
     return retval
 
@@ -367,6 +372,11 @@ if __name__ == '__main__':
     i = 0
     correct = 0
     total = 0
+
+    for paper in graph.validation_papers:
+        x = test_paper([paper, graph, config])
+        exit()
+
 
     pool = Pool(4)
     if config["mode"] == "validation":
