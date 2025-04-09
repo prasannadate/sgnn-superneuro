@@ -330,11 +330,14 @@ def test_paper(x):
     model.stdp_setup(time_steps=config["stdp_timesteps"],
         Apos=config["apos"], Aneg=config["aneg"] * config["stdp_timesteps"], negative_update=True, positive_update=True)
     model.setup()
-    with open("pre_sim_model.pkl", "wb") as f:
-        pickle.dump(model, f)
+#     with open("pre_sim_model.pkl", "wb") as f:
+#         pickle.dump(model, f)
     model.simulate(time_steps=timesteps)
-    with open("post_sim_model.pkl", "wb") as f:
-        pickle.dump(model, f)
+#     with open("post_sim_model.pkl", "wb") as f:
+#         pickle.dump(model, f)u
+
+    num_spikes = np.sum(np.array(model.spike_train))
+#     print(num_spikes)
     min_weight = -1000
 
     # Analyze the weights between the test paper neuron and topic neurons
@@ -355,16 +358,16 @@ def test_paper(x):
 
     actual_topic = graph.paper_to_topic[paper]
     retval = 1 if actual_topic == min_topic else 0
-    if retval == 1:
-        print(f"MIN VAL for {paper} Topic {min_topic} CORRECT")
-    else:
-        print(f"MIN VAL for {paper} Topic {min_topic} WRONG, Expected {actual_topic}")
+#     if retval == 1:
+#         print(f"MIN VAL for {paper} Topic {min_topic} CORRECT")
+#     else:
+#         print(f"MIN VAL for {paper} Topic {min_topic} WRONG, Expected {actual_topic}")
 
-    return retval
+    return retval, num_spikes
 
 
 if __name__ == '__main__':
-    config = yaml.safe_load(open("configs/microseer/default_microseer_config.yaml"))
+    config = yaml.safe_load(open("configs/citeseer/default_citeseer_config.yaml"))
 
     np.random.seed(config["seed"])
     graph = GraphData(config["dataset"], config)
@@ -372,20 +375,19 @@ if __name__ == '__main__':
     i = 0
     correct = 0
     total = 0
+    num_spikes = 0
 
-    for paper in graph.validation_papers:
-        x = test_paper([paper, graph, config])
-        exit()
-
-
-    pool = Pool(4)
+    pool = Pool(8)
     if config["mode"] == "validation":
         papers = []
         for paper in graph.validation_papers:
             papers.append([paper, graph, config])
         x = pool.map(test_paper, papers)
-        valid_acc = np.sum(x) / len(graph.validation_papers)
-        print("Validation Accuracy:", np.sum(x) / len (graph.validation_papers))
+
+        valid_acc = sum(i[0] for i in x) / len(graph.validation_papers)
+        num_spikes = sum(i[1] for i in x)
+        print("Number of spikes:", num_spikes)
+        print("Validation Accuracy:", valid_acc)
         if config["dump_json"] == 1:
             with open('results.json', 'a') as f:
                 accuracy = {
@@ -399,8 +401,10 @@ if __name__ == '__main__':
         for paper in graph.test_papers:
             papers.append([paper, graph, config])
         x = pool.map(test_paper, papers)
-        test_acc = np.sum(x) / len(graph.test_papers)
-        print("Test Accuracy:", np.sum(x) / len (graph.test_papers))
+        test_acc = sum(i[0] for i in x) / len(graph.test_papers)
+        num_spikes = sum(i[1] for i in x)
+        print("Number of spikes:", num_spikes)
+        print("Test Accuracy:", test_acc)
         if config["dump_json"] == 1:
             with open('results.json', 'a') as f:
                 accuracy = {
