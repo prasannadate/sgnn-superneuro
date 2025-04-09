@@ -29,6 +29,6 @@ monitors: False
 paper_to_feature_stdp: False
 paper_to_feature_weighted: False
 apos: [1.0, .5, .1, .01, .001]
-aneg: [.0001]
+aneg: [-0.0001]
 stdp_timesteps: 5
 dump_json: 1

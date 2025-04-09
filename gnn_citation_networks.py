@@ -1,15 +1,22 @@
-import sys
-import superneuromat as snm
-import networkx as nx
-import numpy as np
-import matplotlib.pyplot as plt
-import argparse
+import os
+import time
 import json
 import yaml
+import argparse
+import tempfile
+import pickle as pkl
 import pathlib as pl
 from multiprocessing import Pool
+from dataclasses import dataclass, field
 
-wd = pl.Path(__file__).parent.absolute()
+import tqdm
+import numpy as np
+import networkx as nx
+import superneuromat as snm
+# import matplotlib.pyplot as plt
+from tqdm.contrib.concurrent import process_map
+
+wd = pl.Path(__file__).parent.absolute()  # get the Path() of this python file
 
 
 class GraphData():
@@ -29,6 +36,23 @@ class GraphData():
             self.train_val_test_split()
         self.load_features()
         self.load_graph()
+
+    @classmethod
+    def read_directed_cites_tab(cls, path):
+        with open(path, 'r') as f:
+            lines = f.readlines()
+        return cls.read_directed_cites_lines(lines)
+
+    @classmethod
+    def read_directed_cites_lines(cls, lines):
+        for line in lines:
+            fields = line.strip().split()
+            if len(fields) < 4:  # skip the first two lines
+                continue
+            _cite_id, paper, _sep, cited, *_ = fields  # extract paper id and cited paper id fields
+            paper = int(paper.strip().removeprefix("paper:"))
+            cited = int(cited.strip().removeprefix("paper:"))
+            yield paper, cited
 
     def load_topics(self):
         if (self.name == "cora"):
@@ -79,17 +103,18 @@ class GraphData():
                 self.paper_to_topic[fields[0]] = fields[-1]
                 self.index_to_paper.append(fields[0])
         elif (self.name == "pubmed"):
-            f = open(wd / "data/Pubmed-Diabetes/data/Pubmed-Diabetes.NODE.paper.tab", 'r')
-            lines = f.readlines()
-            f.close()
-            lines = lines[2:]
+            with open(wd / "data/Pubmed-Diabetes/data/Pubmed-Diabetes.NODE.paper.tab", 'r') as f:
+                lines = f.readlines()  # read the file
+            lines = lines[2:]  # skip the first two lines
 
             for line in lines:
-                fields = line.strip().split()
-                if (fields[1] not in self.topics):
-                    self.topics.append(fields[1])
-                self.paper_to_topic["paper:" + fields[0]] = fields[1]
-                self.index_to_paper.append("paper:" + fields[0])
+                fields = line.strip().split()  # split on tab separator
+                paper_idx, topic, *_features = fields  # extract paper name and topic/label
+                if (topic not in self.topics):
+                    self.topics.append(topic)
+                paper_idx = int(paper_idx.strip().removeprefix("paper:"))  # make paper ID an int
+                self.paper_to_topic[paper_idx] = topic  # associate paper ID (as int) with topic/label
+                self.index_to_paper.append(paper_idx)
 
     def load_features(self):
         self.features = {}  # keyed on paper ID, value is the feature vector
@@ -139,7 +164,7 @@ class GraphData():
                 self.num_features = len(feature)
             print(wd / "NUM PAPERS WITH FEATURES: ", len(self.features.keys()))
         elif (self.name == "pubmed"):
-            f = open("data/Pubmed-Diabetes/data/Pubmed-Diabetes.NODE.paper.tab", 'r')
+            f = open(wd / "data/Pubmed-Diabetes/data/Pubmed-Diabetes.NODE.paper.tab", 'r')
             lines = f.readlines()
             f.close()
             feature_line = lines[1]
@@ -155,7 +180,7 @@ class GraphData():
             for line in lines:
                 feature = [0] * self.num_features
                 fields = line.split()
-                paper_id = "paper:" + fields[0]
+                paper_id = int(fields[0])
                 xfields = fields[-1].split('=')
                 xfields = xfields[1].split(',')
                 for x in xfields:
@@ -185,7 +210,10 @@ class GraphData():
             self.graph = nx.read_edgelist(wd / "data/miniseer/miniseer.cites")
 
         elif (self.name == "pubmed"):
-            self.graph = nx.read_edgelist(wd / "data/Pubmed-Diabetes/data/edge_list.csv", delimiter=",")
+            # self.graph = nx.read_edgelist(wd / "data/Pubmed-Diabetes/data/edge_list.csv", delimiter=",")
+            self.graph = nx.from_edgelist(self.read_directed_cites_tab(  # above broken for me so I wrote new one -kz-apr'25
+                wd / "data/Pubmed-Diabetes/data/Pubmed-Diabetes.DIRECTED.cites.tab"
+            ))
 
     def train_val_test_split(self):
         np.random.seed(self.config["seed"])
@@ -269,13 +297,13 @@ def load_network(graph, config):
             neuron = model.create_neuron(threshold=config["paper_threshold"], leak=config["paper_leak"], refractory_period=config["validation_ref"])
         elif node in graph.test_papers:
             neuron = model.create_neuron(threshold=config["paper_threshold"], leak=config["paper_leak"], refractory_period=config["test_ref"])
-        paper_neurons[node] = neuron
-        # paper_neurons[node] = neuron.idx
+        # paper_neurons[node] = neuron
+        paper_neurons[node] = neuron.idx
 
     for t in graph.topics:
         neuron = model.create_neuron(threshold=config["topic_threshold"], leak=config["topic_leak"], refractory_period=0)
-        # topic_neurons[t] = neuron.idx
-        topic_neurons[t] = neuron
+        # topic_neurons[t] = neuron
+        topic_neurons[t] = neuron.idx
 
     for edge in graph.graph.edges:
         if (edge[0] not in graph.paper_to_topic.keys() or edge[1] not in graph.paper_to_topic.keys()):
@@ -321,80 +349,114 @@ def load_network(graph, config):
     return paper_neurons, topic_neurons, model
 
 
-def test_paper(x):
-    paper, graph, config = x
+def create_model(graph, config):
     paper_neurons, topic_neurons, model = load_network(graph, config)
-    paper_id = paper_neurons[paper]
-    model.add_spike(0, paper_id, 100.0)
-    timesteps = config["simtime"]
     model.stdp_setup(time_steps=config["stdp_timesteps"],
         Apos=config["apos"], Aneg=config["aneg"] * config["stdp_timesteps"], negative_update=True, positive_update=True)
-    model.setup()
-    model.simulate(time_steps=timesteps)
-    min_weight = -1000
+    return model, paper_neurons, topic_neurons
+
+
+def test_paper_from_pickle(x):
+    paper_id, temp = x
+    with open(temp, 'rb') as f:
+        d = pkl.load(f)
+    return test_paper((paper_id, d))
+
+
+def test_paper(x):
+    paper_id, d = x
+    model = d["model"]
+    graph = d["graph"]
+    paper_neurons = d["paper_neurons"]
+    topic_neurons = d["topic_neurons"]
+    config = d["config"]
+    model.add_spike(0, paper_neurons[paper_id], 100.0)
+    # model.setup()
+    model.simulate(time_steps=config["simtime"], use='gpu')
+
+    def get_synapse(model, pre_id, post_id):
+        for i, (pre, post) in enumerate(zip(model.pre_synaptic_neuron_ids, model.post_synaptic_neuron_ids)):
+            if pre_id == pre and post_id == post:
+                return i
 
     # Analyze the weights between the test paper neuron and topic neurons
-    min_topic = None
+    topic_weights = {}
     for topic_id, topic_paper_id in topic_neurons.items():
         # Find the synapse from topic neuron to test paper neuron
-        for i, (pre, post) in enumerate(zip(model.pre_synaptic_neuron_ids, model.post_synaptic_neuron_ids)):
-            if pre == paper_id and post == topic_paper_id:
-                synapse_indices = i
-        if synapse_indices:
-            idx = synapse_indices
-            weight = model.synaptic_weights[idx]
-#             print(f"Topic: {topic_id}, Paper: {paper}, Weight: {weight}")
-            if weight > min_weight:
-                min_weight = weight
-                min_topic = topic_id
+        synapse_idx = get_synapse(model, paper_neurons[paper_id], topic_paper_id)
+        if synapse_idx:
+            weight = model.synaptic_weights[synapse_idx]
+            topic_weights[topic_id] = weight
+            # print(f"Topic: {topic_id}, Paper: {paper_id}, Weight: {weight}")
 
-    actual_topic = graph.paper_to_topic[paper]
-    retval = 1 if actual_topic == min_topic else 0
-#     if retval == 1:
-#         print(f"MIN VAL for {paper} Topic {min_topic} CORRECT")
-#     else:
-#         print(f"MIN VAL for {paper} Topic {min_topic} WRONG, Expected {actual_topic}")
+    best_topic = max(topic_weights, key=topic_weights.get)
 
+    actual_topic = graph.paper_to_topic[paper_id]
+    retval = actual_topic == best_topic
+    # if retval:
+    #     print(f"MIN VAL for {paper} Topic {min_topic} CORRECT")
+    # else:
+    #     print(f"MIN VAL for {paper} Topic {min_topic} WRONG, Expected {actual_topic}")
+    # del graph, model, paper_neurons, topic_neurons, config, d, temp, x  # unload to save memory
     return retval
 
 
 if __name__ == '__main__':
-    config = yaml.safe_load(open(wd / "configs/miniseer/default_miniseer_config.yaml"))
+    parser = argparse.ArgumentParser()
+    # parser.add_argument('--config', type=str, default=wd / 'configs/miniseer/default_miniseer_config.yaml')
+    parser.add_argument('--config', type=str, default=wd / 'configs/pubmed/default_pubmed_config.yaml')
+    args = parser.parse_args()
+    config = yaml.safe_load(open(args.config))
 
     np.random.seed(config["seed"])
     graph = GraphData(config["dataset"], config)
+    model, paper_neurons, topic_neurons = create_model(graph, config)
 
-    i = 0
-    correct = 0
-    total = 0
+    # save model to file for multiprocessing
+    d = {
+        'graph': graph,
+        'config': config,
+        'model': model,
+        'paper_neurons': paper_neurons,
+        'topic_neurons': topic_neurons,
+    }
+    temp = tempfile.NamedTemporaryFile(delete=False)
+    with open(temp.name, 'wb') as f:
+        pkl.dump(d, f)
+    papers = []
 
-    pool = Pool(4)
-    if config["mode"] == "validation":
-        papers = []
-        for paper in graph.validation_papers:
-            papers.append([paper, graph, config])
-        x = pool.map(test_paper, papers)
-        valid_acc = np.sum(x) / len(graph.validation_papers)
-        print("Validation Accuracy:", np.sum(x) / len(graph.validation_papers))
-        if config["dump_json"] == 1:
-            with open('results.json', 'a') as f:
-                accuracy = {
-                    "validation_accuracy": valid_acc
-                }
-                dump_data = config | accuracy
-                json.dump(dump_data, f, indent=2)
+    mode = config['mode']
+    if mode == 'test':
+        papers = graph.test_papers
+    if mode == "validation":
+        papers = graph.validation_papers
+    n = len(papers)
+    bundles = [(paperstr, temp.name) for paperstr in papers]
+    del papers, graph, model, paper_neurons, topic_neurons  # unload to save memory
 
-    if config["mode"] == "test":
-        papers = []
-        for paper in graph.test_papers:
-            papers.append([paper, graph, config])
-        x = pool.map(test_paper, papers)
-        test_acc = np.sum(x) / len(graph.test_papers)
-        print("Test Accuracy:", np.sum(x) / len(graph.test_papers))
-        if config["dump_json"] == 1:
-            with open('results.json', 'a') as f:
-                accuracy = {
-                    "test_accuracy": test_acc
-                }
-                dump_data = config | accuracy
-                json.dump(dump_data, f, indent=2)
+    start = time.time()
+
+    # single-process evaluation
+    # bundles = [(paperstr, d) for paperstr in papers]
+    # x = [test_paper(bundle) for bundle in tqdm.tqdm(bundles)]
+
+    try:  # multi-process evaluation
+        x = process_map(test_paper, bundles, max_workers=2)  # with tqdm
+        # pool = Pool(2)
+        # x = pool.map(test_paper, bundles)
+        pass
+    finally:  # clean up and delete the temp file no matter what
+        temp.close()  # close the temp file
+        os.unlink(temp.name)  # DON'T COMMENT OUT THIS.
+    end = time.time()
+    print(f"Time taken: {end - start}")
+
+    accuracy = np.sum(x) / n
+    print(f"{mode.title()} Accuracy:", accuracy)
+    if config["dump_json"] == 1:
+        with open('results.json', 'a') as f:
+            accuracy = {
+                f"{mode}_accuracy": accuracy
+            }
+            dump_data = config | accuracy
+            json.dump(dump_data, f, indent=2)
