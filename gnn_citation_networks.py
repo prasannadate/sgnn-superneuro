@@ -1,9 +1,9 @@
 import os
 import time
 import json
-import yaml
 import argparse
 import tempfile
+import xyaml as yaml
 import pickle as pkl
 import pathlib as pl
 from multiprocessing import Pool
@@ -26,6 +26,8 @@ class GraphData():
         self.paper_to_topic = {}  # maps the paper ID in the dataset to its topic ID
         self.index_to_paper = []    # creates an index for each paper
         self.topics = []            # the list of topics
+        self.edges_path = pl.Path(config["edges_path"])
+        self.nodes_path = pl.Path(config["nodes_path"])
         self.train_papers = []
         self.validation_papers = []
         self.test_papers = []
@@ -55,137 +57,52 @@ class GraphData():
             yield paper, cited
 
     def load_topics(self):
-        if (self.name == "cora"):
-            f = open(wd / "data/Cora/group-edges.csv", 'r')
-            lines = f.readlines()
-            f.close()
-
+        topics = set()
+        if self.nodes_path.suffix == ".content":
+            with open(self.nodes_path, 'r') as f:
+                lines = f.readlines()
             for line in lines:
-                fields = line.strip().split(",")
-                if (fields[1] not in self.topics):
-                    self.topics.append(fields[1])
-                self.paper_to_topic[fields[0]] = fields[1]
-                self.index_to_paper.append(fields[0])
-        elif (self.name == "citeseer"):
-            f = open(wd / "data/citeseer/citeseer.content", 'r')
-            lines = f.readlines()
-            f.close()
-
-            for line in lines:
-                fields = line.strip().split()
-                if (fields[-1] not in self.topics):
-                    self.topics.append(fields[-1])
-                # print(fields[0])
-                self.paper_to_topic[fields[0]] = fields[-1]
-                self.index_to_paper.append(fields[0])
-        elif (self.name == "microseer"):
-            f = open(wd / "data/microseer/microseer.content", 'r')
-            lines = f.readlines()
-            f.close()
-
-            for line in lines:
-                fields = line.strip().split()
-                if (fields[-1] not in self.topics):
-                    self.topics.append(fields[-1])
-                # print(fields[0])
-                self.paper_to_topic[fields[0]] = fields[-1]
-                self.index_to_paper.append(fields[0])
-        elif (self.name == "miniseer"):
-            f = open(wd / "data/miniseer/miniseer.content", 'r')
-            lines = f.readlines()
-            f.close()
-
-            for line in lines:
-                fields = line.strip().split()
-                if (fields[-1] not in self.topics):
-                    self.topics.append(fields[-1])
-                # print(fields[0])
-                self.paper_to_topic[fields[0]] = fields[-1]
-                self.index_to_paper.append(fields[0])
-        elif (self.name == "pubmed"):
-            with open(wd / "data/Pubmed-Diabetes/data/Pubmed-Diabetes.NODE.paper.tab", 'r') as f:
+                paper_id, *_features, label = line.strip().split()
+                topics.add(label)
+                self.paper_to_topic[paper_id] = label
+                self.index_to_paper.append(paper_id)
+        elif self.nodes_path.suffix == ".tab":
+            with open(self.nodes_path, 'r') as f:
                 lines = f.readlines()  # read the file
             lines = lines[2:]  # skip the first two lines
-
             for line in lines:
                 fields = line.strip().split()  # split on tab separator
                 paper_idx, topic, *_features = fields  # extract paper name and topic/label
-                if (topic not in self.topics):
-                    self.topics.append(topic)
+                topics.add(topic)
                 paper_idx = int(paper_idx.strip().removeprefix("paper:"))  # make paper ID an int
                 self.paper_to_topic[paper_idx] = topic  # associate paper ID (as int) with topic/label
                 self.index_to_paper.append(paper_idx)
+        self.topics = list(topics)
 
     def load_features(self):
         self.features = {}  # keyed on paper ID, value is the feature vector
-        if (self.name == "cora"):
-            f = open(wd / "data/Cora/cora/cora.content", 'r')
-            lines = f.readlines()
-            f.close()
-
+        if self.nodes_path.suffix == ".content":
+            with open(self.nodes_path, 'r') as f:
+                lines = f.readlines()
             for line in lines:
-                fields = line.strip().split()
-                paper_id = fields[0]
-                feature = [int(x) for x in fields[1:-1]]
-                self.features[paper_id] = feature
-                self.num_features = len(feature)
-            print("NUM PAPERS WITH FEATURES: ", len(self.features.keys()))
-        elif (self.name == "citeseer"):
-            f = open(wd / "data/citeseer/citeseer.content", 'r')
-            lines = f.readlines()
-            f.close()
-            for line in lines:
-                fields = line.strip().split()
-                paper_id = fields[0]
-                feature = [int(x) for x in fields[1:-1]]
-                self.features[paper_id] = feature
-                self.num_features = len(feature)
-            print("NUM PAPERS WITH FEATURES: ", len(self.features.keys()))
-        elif (self.name == "microseer"):
-            f = open(wd / "data/microseer/microseer.content", 'r')
-            lines = f.readlines()
-            f.close()
-            for line in lines:
-                fields = line.strip().split()
-                paper_id = fields[0]
-                feature = [int(x) for x in fields[1:-1]]
-                self.features[paper_id] = feature
-                self.num_features = len(feature)
-            print("NUM PAPERS WITH FEATURES: ", len(self.features.keys()))
-        elif (self.name == "miniseer"):
-            f = open(wd / "data/miniseer/miniseer.content", 'r')
-            lines = f.readlines()
-            f.close()
-            for line in lines:
-                fields = line.strip().split()
-                paper_id = fields[0]
-                feature = [int(x) for x in fields[1:-1]]
-                self.features[paper_id] = feature
-                self.num_features = len(feature)
-            print(wd / "NUM PAPERS WITH FEATURES: ", len(self.features.keys()))
-        elif (self.name == "pubmed"):
-            f = open(wd / "data/Pubmed-Diabetes/data/Pubmed-Diabetes.NODE.paper.tab", 'r')
-            lines = f.readlines()
-            f.close()
+                paper_id, *features, _label = line.strip().split()
+                self.features[paper_id] = [int(x) for x in features]
+        elif self.nodes_path.suffix == ".tab":
+            with open(self.nodes_path, 'r') as f:
+                lines = f.readlines()  # read the file
+            # get feature names
             feature_line = lines[1]
             fields = feature_line.split()
-            fields = fields[1:-1]
-            all_features = {}
-            for i in range(len(fields)):
-                feat = fields[i].split(':')[1]
-                all_features[feat] = i
-
-            self.num_features = len(all_features.keys())
-            lines = lines[2:]
+            _cat, *feature_names, _summary = fields
+            all_features = [feature_desc.split(':') for feature_desc in feature_names]  # split each
+            all_features = [name for _type, name, _val in all_features]  # get just the feature name
+            # parse features for each paper
+            lines = lines[2:]  # skip the first two lines
             for line in lines:
-                feature = [0] * self.num_features
-                fields = line.split()
-                paper_id = int(fields[0])
-                xfields = fields[-1].split('=')
-                xfields = xfields[1].split(',')
-                for x in xfields:
-                    feature[all_features[x]] = 1
-                self.features[paper_id] = feature
+                fields = line.strip().split()  # split on tab separator
+                paper_idx, _topic, *features, summary = fields  # extract paper name and topic/label
+                paper_idx = int(paper_idx.strip().removeprefix("paper:"))  # make paper ID an int
+                self.features[paper_idx] = [int(name in summary) for name in all_features]  # convert to binary features
 
         self.paper_to_features = {}  # keyed on paper ID, value is the number of features it has
         self.feature_to_papers = {}  # keyed on feature ID, value is the number of papers that have that feature
@@ -197,23 +114,10 @@ class GraphData():
                 self.feature_to_papers[i] += self.features[p][i]
 
     def load_graph(self):
-        if (self.name == "cora"):
-            self.graph = nx.read_edgelist(wd / "data/Cora/edges.csv", delimiter=",")
-
-        elif (self.name == "citeseer"):
-            self.graph = nx.read_edgelist(wd / "data/citeseer/citeseer.cites")
-
-        elif (self.name == "microseer"):
-            self.graph = nx.read_edgelist(wd / "data/microseer/microseer.cites")
-
-        elif (self.name == "miniseer"):
-            self.graph = nx.read_edgelist(wd / "data/miniseer/miniseer.cites")
-
-        elif (self.name == "pubmed"):
-            # self.graph = nx.read_edgelist(wd / "data/Pubmed-Diabetes/data/edge_list.csv", delimiter=",")
-            self.graph = nx.from_edgelist(self.read_directed_cites_tab(  # above broken for me so I wrote new one -kz-apr'25
-                wd / "data/Pubmed-Diabetes/data/Pubmed-Diabetes.DIRECTED.cites.tab"
-            ))
+        if self.edges_path.suffix == ".cites":
+            self.graph = nx.read_edgelist(self.edges_path)
+        elif self.edges_path.suffix == ".tab":
+            self.graph = nx.from_edgelist(self.read_directed_cites_tab(self.edges_path))
 
     def train_val_test_split(self):
         np.random.seed(self.config["seed"])
@@ -351,8 +255,9 @@ def load_network(graph, config):
 
 def create_model(graph, config):
     paper_neurons, topic_neurons, model = load_network(graph, config)
-    model.stdp_setup(time_steps=config["stdp_timesteps"],
-        Apos=config["apos"], Aneg=config["aneg"] * config["stdp_timesteps"], negative_update=True, positive_update=True)
+    model.apos = config["apos"]
+    model.aneg = config["aneg"]
+    model.backend = config.get("backend", "auto")
     return model, paper_neurons, topic_neurons
 
 
@@ -372,7 +277,7 @@ def test_paper(x):
     config = d["config"]
     model.add_spike(0, paper_neurons[paper_id], 100.0)
     # model.setup()
-    model.simulate(time_steps=config["simtime"], use='gpu')
+    model.simulate(time_steps=config["simtime"])
 
     def get_synapse(model, pre_id, post_id):
         for i, (pre, post) in enumerate(zip(model.pre_synaptic_neuron_ids, model.post_synaptic_neuron_ids)):
@@ -398,20 +303,40 @@ def test_paper(x):
     # else:
     #     print(f"MIN VAL for {paper} Topic {min_topic} WRONG, Expected {actual_topic}")
     # del graph, model, paper_neurons, topic_neurons, config, d, temp, x  # unload to save memory
-    return retval
+    return retval, model.ispikes.sum()
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    # parser.add_argument('--config', type=str, default=wd / 'configs/miniseer/default_miniseer_config.yaml')
-    parser.add_argument('--config', type=str, default=wd / 'configs/pubmed/default_pubmed_config.yaml')
+    parser.add_argument('--backend', choices=["auto", "cpu", "jit", "gpu"])
+    # parser.add_argument('--config', default=wd / 'configs/miniseer/default_miniseer_config.yaml')
+    # parser.add_argument('--config', default=wd / 'configs/citeseer/default_citeseer_config.yaml')
+    # parser.add_argument('--config', default=wd / 'configs/cora/default_cora_config.yaml')
+    parser.add_argument('--config', default=wd / 'configs/pubmed/default_pubmed_config.yaml')
     args = parser.parse_args()
-    config = yaml.safe_load(open(args.config))
+
+    model_time = time.time()
+    with open(args.config, 'r') as f:
+        config = yaml.load(f)
+
+    backend = args.backend or config.get("backend", "auto")
 
     np.random.seed(config["seed"])
     graph = GraphData(config["dataset"], config)
     model, paper_neurons, topic_neurons = create_model(graph, config)
 
+    if backend == "auto":
+        backend = model.recommend(config["simtime"])
+        model.backend = backend
+    if backend == "gpu":
+        processes = config.get("gpu_processes", 1)
+    elif config.get("processes", "auto") == "auto":
+        processes = os.cpu_count()
+    else:
+        processes = config["processes"]
+
+    model_time = time.time() - model_time
+    print(f"Time to load dataset and create model: {model_time} seconds")
     # save model to file for multiprocessing
     d = {
         'graph': graph,
@@ -425,6 +350,12 @@ if __name__ == '__main__':
         pkl.dump(d, f)
     papers = []
 
+    load_time = time.time()
+    with open(temp.name, 'rb') as f:
+        pkl.load(f)
+    load_time = time.time() - load_time
+    print(f"Time to load model from pickle: {load_time} seconds")
+
     mode = config['mode']
     if mode == 'test':
         papers = graph.test_papers
@@ -434,26 +365,29 @@ if __name__ == '__main__':
     bundles = [(paperstr, temp.name) for paperstr in papers]
     del papers, graph, model, paper_neurons, topic_neurons  # unload to save memory
 
-    start = time.time()
+    eval_time = time.time()
 
-    # single-process evaluation
-    # bundles = [(paperstr, d) for paperstr in papers]
-    # x = [test_paper(bundle) for bundle in tqdm.tqdm(bundles)]
+    if processes == 1:
+        # single-process evaluation
+        bundles = [(paperstr, d) for paperstr in papers]
+        x = [test_paper(bundle) for bundle in tqdm.tqdm(bundles)]
+    else:
+        try:  # multi-process evaluation
+            x = process_map(test_paper_from_pickle, bundles, max_workers=processes, chunksize=1)  # with tqdm
+            # pool = Pool(2)
+            # x = pool.map(test_paper, bundles)
+            pass
+        finally:  # clean up and delete the temp file no matter what
+            temp.close()  # close the temp file
+            os.unlink(temp.name)  # DON'T COMMENT OUT THIS.
+    eval_time = time.time() - eval_time
+    print(f"Evaluation time: {eval_time} seconds")
 
-    try:  # multi-process evaluation
-        x = process_map(test_paper, bundles, max_workers=2)  # with tqdm
-        # pool = Pool(2)
-        # x = pool.map(test_paper, bundles)
-        pass
-    finally:  # clean up and delete the temp file no matter what
-        temp.close()  # close the temp file
-        os.unlink(temp.name)  # DON'T COMMENT OUT THIS.
-    end = time.time()
-    print(f"Time taken: {end - start}")
-
-    accuracy = np.sum(x) / n
+    results, spikes = zip(*x)
+    accuracy = np.sum(results) / n
     print(f"{mode.title()} Accuracy:", accuracy)
-    if config["dump_json"] == 1:
+    print(f"Total spikes:", np.sum(spikes))
+    if config.get("dump_json", None):
         with open('results.json', 'a') as f:
             accuracy = {
                 f"{mode}_accuracy": accuracy

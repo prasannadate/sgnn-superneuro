@@ -1,5 +1,7 @@
 dataset: pubmed  # Choices: ["cora", "citeseer", "pubmed", "microseer"]
 mode: validation  # Choices: ["validation", "test"]
+nodes_path: !relpath ../../data/Pubmed-Diabetes/data/Pubmed-Diabetes.NODE.paper.tab
+edges_path: !relpath ../../data/Pubmed-Diabetes/data/Pubmed-Diabetes.DIRECTED.cites.tab
 seed: 0
 features: 0  # Choices: [0,1]
 paper_leak: 0.0  # Choices: [1., 10., 100., 100000.]
@@ -24,11 +26,13 @@ paper_to_feature_weight: 0.2  # Choices: [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8
 feature_to_paper_weight: 0.2  # Choices: [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
 paper_to_feature_delay: 4  # Choices: [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0]
 simtime: 10  # Choices: [5., 10., 20., 30., 40., 50., 75., 100., 150., 200.]
-processes: 8  # Adjust based on machine capabilities
 monitors: False
 paper_to_feature_stdp: False
 paper_to_feature_weighted: False
 apos: [1.0, .5, .1, .01, .001]
-aneg: [-0.0001]
+aneg: !np "[-0.0001] * 5"
 stdp_timesteps: 5
 dump_json: 1
+backend: auto
+processes: auto  # Adjust based on machine capabilities
+gpu_processes: 2
