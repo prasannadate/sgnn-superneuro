@@ -8,6 +8,7 @@ import json
 import yaml
 import pickle
 from multiprocessing import Pool
+import time
 
 class GraphData():
     def __init__(self, name, config):
@@ -252,7 +253,7 @@ class GraphData():
         self.validation_papers = validation_papers
 
 def load_network(graph, config):
-    model = snm.NeuromorphicModel()
+    model = snm.SNN()
     # Read paper to paper edge list
     topic_neurons = {}
     # Create paper neurons
@@ -283,8 +284,9 @@ def load_network(graph, config):
         graph_weight = 100.0
         variations = (1.0 + np.random.normal(0, variation_scale))
         graph_delay = 1
-        model.create_synapse(pre, post, weight=config["graph_weight"], delay=config["graph_delay"], stdp_enabled=False)
-        model.create_synapse(post, pre, weight=config["graph_weight"], delay=config["graph_delay"], stdp_enabled=False)
+        if pre != post:
+            model.create_synapse(pre, post, weight=config["graph_weight"], delay=config["graph_delay"], stdp_enabled=False)
+            model.create_synapse(post, pre, weight=config["graph_weight"], delay=config["graph_delay"], stdp_enabled=False)
 
     for paper in graph.train_papers:
         paper_neuron = paper_neurons[paper]
@@ -329,7 +331,7 @@ def test_paper(x):
     timesteps = config["simtime"]
     model.stdp_setup(time_steps=config["stdp_timesteps"],
         Apos=config["apos"], Aneg=config["aneg"] * config["stdp_timesteps"], negative_update=True, positive_update=True)
-    model.setup()
+    model.setup(sparse=True)
 #     with open("pre_sim_model.pkl", "wb") as f:
 #         pickle.dump(model, f)
     model.simulate(time_steps=timesteps)
@@ -367,7 +369,7 @@ def test_paper(x):
 
 
 if __name__ == '__main__':
-    config = yaml.safe_load(open("configs/citeseer/default_citeseer_config.yaml"))
+    config = yaml.safe_load(open("configs/pubmed/default_pubmed_config.yaml"))
 
     np.random.seed(config["seed"])
     graph = GraphData(config["dataset"], config)
@@ -376,6 +378,8 @@ if __name__ == '__main__':
     correct = 0
     total = 0
     num_spikes = 0
+
+    start_time = time.time()
 
     pool = Pool(8)
     if config["mode"] == "validation":
@@ -412,3 +416,6 @@ if __name__ == '__main__':
                 }
                 dump_data = config | accuracy
                 json.dump(dump_data, f, indent=2)
+
+    end_time = time.time()
+    print(f"Execution time: {end_time - start_time} seconds")

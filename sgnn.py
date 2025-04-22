@@ -1,12 +1,12 @@
 import numpy as np
 
-from superneuromat.neuromorphicmodel import NeuromorphicModel
+import superneuromat as snm
 
 
 def load_network(graph, config):
 
     # Initialize the Neuromorphic Model
-    model = NeuromorphicModel()
+    model = snm.SNN()
 
     # Dictionaries to hold neuron IDs
     topic_neurons = {}
@@ -146,7 +146,7 @@ def test_paper(x):
         )
 
     # Prepare the model for simulation
-    model.setup()
+    model.setup(sparse=True)
 
     # Simulate the model
     model.simulate(time_steps=simtime)
