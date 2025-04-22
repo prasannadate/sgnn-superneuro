@@ -35,4 +35,4 @@ stdp_timesteps: 5
 dump_json: 1
 backend: auto
 processes: auto  # Adjust based on machine capabilities
-gpu_processes: 16
+gpu_processes: 8

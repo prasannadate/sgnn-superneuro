@@ -20,7 +20,7 @@ wd = pl.Path(__file__).parent.absolute()  # get the Path() of this python file
 
 
 class GraphData():
-    def __init__(self, name, config):
+    def __init__(self, name, config, rng=None):
         self.name = name
         self.config = config
         self.paper_to_topic = {}  # maps the paper ID in the dataset to its topic ID
@@ -31,6 +31,17 @@ class GraphData():
         self.train_papers = []
         self.validation_papers = []
         self.test_papers = []
+
+        if rng is None:
+            self.seed = np.random.randint(0, 2**16)
+            self.rng = np.random.default_rng(self.seed)
+        elif not isinstance(rng, np.random.Generator):
+            self.seed = rng
+            self.rng = np.random.default_rng(self.seed)
+        else:
+            self.seed = None
+            self.rng = rng
+
         self.load_topics()
         if self.name == "microseer":
             self.train_val_test_split_small()
@@ -120,7 +131,6 @@ class GraphData():
             self.graph = nx.from_edgelist(self.read_directed_cites_tab(self.edges_path))
 
     def train_val_test_split(self):
-        np.random.seed(self.config["seed"])
         train_papers = []
         test_papers = []
         validation_papers = []
@@ -130,14 +140,14 @@ class GraphData():
             check_breakdown[k] = 0
 
         while (len(train_papers) < len(self.topics) * 20):
-            index = np.random.randint(len(self.index_to_paper))
+            index = self.rng.integers(len(self.index_to_paper))
             topic = self.paper_to_topic[self.index_to_paper[index]]
             if (check_breakdown[topic] < 20 and self.index_to_paper[index] not in train_papers):
                 train_papers.append(self.index_to_paper[index])
                 check_breakdown[topic] += 1
 
         while (len(validation_papers) < len(self.topics) * 20):
-            index = np.random.randint(len(self.index_to_paper))
+            index = self.rng.integers(len(self.index_to_paper))
             topic = self.paper_to_topic[self.index_to_paper[index]]
             if (check_breakdown[topic] < 40 and self.index_to_paper[index] not in train_papers and self.index_to_paper[index] not in validation_papers):
                 validation_papers.append(self.index_to_paper[index])
@@ -152,7 +162,6 @@ class GraphData():
         self.validation_papers = validation_papers
 
     def train_val_test_split_small(self):
-        np.random.seed(self.config["seed"])
         train_papers = []
         test_papers = []
         validation_papers = []
@@ -162,22 +171,22 @@ class GraphData():
             check_breakdown[k] = 0
 
         while (len(train_papers) < len(self.topics) * 5):
-            index = np.random.randint(len(self.index_to_paper))
-            topic = self.paper_to_topic[self.index_to_paper[index]]
-            if (check_breakdown[topic] < 10 and self.index_to_paper[index] not in train_papers):
-                train_papers.append(self.index_to_paper[index])
+            paper_id = self.rng.choice(self.index_to_paper)
+            topic = self.paper_to_topic[paper_id]
+            if (check_breakdown[topic] < 10 and paper_id not in train_papers):
+                train_papers.append(paper_id)
                 check_breakdown[topic] += 1
 
         while (len(validation_papers) < len(self.topics) * 5):
-            index = np.random.randint(len(self.index_to_paper))
-            topic = self.paper_to_topic[self.index_to_paper[index]]
-            if (check_breakdown[topic] < 20 and self.index_to_paper[index] not in train_papers and self.index_to_paper[index] not in validation_papers):
-                validation_papers.append(self.index_to_paper[index])
+            paper_id = self.rng.choice(self.index_to_paper)
+            topic = self.paper_to_topic[paper_id]
+            if (check_breakdown[topic] < 20 and paper_id not in train_papers and paper_id not in validation_papers):
+                validation_papers.append(paper_id)
                 check_breakdown[topic] += 1
 
-        for i in range(len(self.index_to_paper)):
-            if (self.index_to_paper[i] not in train_papers and self.index_to_paper[i] not in validation_papers and self.index_to_paper[i] in self.paper_to_topic.keys()):
-                test_papers.append(self.index_to_paper[i])
+        for paper_id in self.index_to_paper:
+            if (paper_id not in train_papers and paper_id not in validation_papers and paper_id in self.paper_to_topic.keys()):
+                test_papers.append(paper_id)
 
         self.train_papers = train_papers
         self.test_papers = test_papers
@@ -185,7 +194,7 @@ class GraphData():
 
 
 def load_network(graph, config):
-    model = snm.NeuromorphicModel()
+    model = snm.SNN()
     # Read paper to paper edge list
     topic_neurons = {}
     # Create paper neurons
@@ -210,12 +219,15 @@ def load_network(graph, config):
         topic_neurons[t] = neuron.idx
 
     for edge in graph.graph.edges:
-        if (edge[0] not in graph.paper_to_topic.keys() or edge[1] not in graph.paper_to_topic.keys()):
+        paper, cited = edge
+        if (paper not in graph.paper_to_topic.keys() or cited not in graph.paper_to_topic.keys()):
             continue
-        pre = paper_neurons[edge[0]]
-        post = paper_neurons[edge[1]]
+        pre = paper_neurons[paper]
+        post = paper_neurons[cited]
+        if pre == post:
+            continue
         graph_weight = 100.0
-        variations = (1.0 + np.random.normal(0, variation_scale))
+        variations = (1.0 + graph.rng.normal(0, variation_scale))
         graph_delay = 1
         model.create_synapse(pre, post, weight=config["graph_weight"], delay=config["graph_delay"], stdp_enabled=False)
         model.create_synapse(post, pre, weight=config["graph_weight"], delay=config["graph_delay"], stdp_enabled=False)
@@ -224,7 +236,7 @@ def load_network(graph, config):
         paper_neuron = paper_neurons[paper]
         topic_neuron = topic_neurons[graph.paper_to_topic[paper]]
         train_to_topic_w = 1.0
-        train_to_topic_w *= (1.0 + np.random.normal(0, variation_scale))
+        train_to_topic_w *= (1.0 + graph.rng.normal(0, variation_scale))
         train_to_topic_d = 1
         model.create_synapse(paper_neuron, topic_neuron, weight=config["train_to_topic_weight"], delay=config["train_to_topic_delay"], stdp_enabled=False)
         model.create_synapse(topic_neuron, paper_neuron, weight=config["train_to_topic_weight"], delay=config["train_to_topic_delay"], stdp_enabled=False)
@@ -235,7 +247,7 @@ def load_network(graph, config):
             topic_neuron = topic_neurons[topic]
 
             validation_to_topic_w = 0.001
-            validation_to_topic_w *= (1.0 + np.random.normal(0, variation_scale))
+            validation_to_topic_w *= (1.0 + graph.rng.normal(0, variation_scale))
             validation_to_topic_d = 1
             model.create_synapse(paper_neuron, topic_neuron, stdp_enabled=True, weight=config["validation_to_topic_weight"], delay=config["validation_to_topic_delay"])
             model.create_synapse(topic_neuron, paper_neuron, stdp_enabled=True, weight=config["validation_to_topic_weight"], delay=config["validation_to_topic_delay"])
@@ -245,7 +257,7 @@ def load_network(graph, config):
             paper_neuron = paper_neurons[paper]
             topic_neuron = topic_neurons[topic]
             test_to_topic_w = 0.001
-            test_to_topic_w *= (1.0 + np.random.normal(0, variation_scale))
+            test_to_topic_w *= (1.0 + graph.rng.normal(0, variation_scale))
             test_to_topic_d = 1
             model.create_synapse(paper_neuron, topic_neuron, stdp_enabled=True, weight=config["test_to_topic_weight"], delay=config["test_to_topic_delay"])
             model.create_synapse(topic_neuron, paper_neuron, stdp_enabled=True, weight=config["test_to_topic_weight"], delay=config["test_to_topic_delay"])
@@ -268,51 +280,53 @@ def test_paper_from_pickle(x):
     return test_paper((paper_id, d))
 
 
+# def get_synapse(model, pre_id, post_id):
+#     for i, (pre, post) in enumerate(zip(model.pre_synaptic_neuron_ids, model.post_synaptic_neuron_ids)):
+#         if pre_id == pre and post_id == post:
+#             return i
+
+
 def test_paper(x):
     paper_id, d = x
-    model = d["model"]
+    snn = d["model"]
     graph = d["graph"]
     paper_neurons = d["paper_neurons"]
     topic_neurons = d["topic_neurons"]
     config = d["config"]
-    model.add_spike(0, paper_neurons[paper_id], 100.0)
-    # model.setup()
-    model.simulate(time_steps=config["simtime"])
 
-    def get_synapse(model, pre_id, post_id):
-        for i, (pre, post) in enumerate(zip(model.pre_synaptic_neuron_ids, model.post_synaptic_neuron_ids)):
-            if pre_id == pre and post_id == post:
-                return i
+    snn.add_spike(0, paper_neurons[paper_id], 100.0)
+    # model.setup()
+    snn.simulate(time_steps=config["simtime"])
 
     # Analyze the weights between the test paper neuron and topic neurons
-    topic_weights = {}
+    topic_weights = []
     for topic_id, topic_paper_id in topic_neurons.items():
         # Find the synapse from topic neuron to test paper neuron
-        synapse_idx = get_synapse(model, paper_neurons[paper_id], topic_paper_id)
-        if synapse_idx:
-            weight = model.synaptic_weights[synapse_idx]
-            topic_weights[topic_id] = weight
-            # print(f"Topic: {topic_id}, Paper: {paper_id}, Weight: {weight}")
+        synapse = snn.get_synapse(paper_neurons[paper_id], topic_paper_id)
+        topic_weights.append((topic_id, synapse.weight))
 
-    best_topic = max(topic_weights, key=topic_weights.get)
-
+    # sort by highest to lowest weight
+    topic_weights = sorted(topic_weights, key=lambda x: x[1], reverse=True)
+    best_topic, best_weight = topic_weights[0]
+    _runner_up, runner_up_weight = topic_weights[1]
+    if best_weight == runner_up_weight:  # check for ties
+        best_topic = None  # don't count ties as correct
     actual_topic = graph.paper_to_topic[paper_id]
-    retval = actual_topic == best_topic
-    # if retval:
-    #     print(f"MIN VAL for {paper} Topic {min_topic} CORRECT")
-    # else:
-    #     print(f"MIN VAL for {paper} Topic {min_topic} WRONG, Expected {actual_topic}")
-    # del graph, model, paper_neurons, topic_neurons, config, d, temp, x  # unload to save memory
-    return retval, model.ispikes.sum()
+    total_spikes = snn.ispikes.sum()
+    snn.release_mem()
+    del snn, graph
+    del d
+    match = actual_topic == best_topic
+    return match, total_spikes
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--backend', choices=["auto", "cpu", "jit", "gpu"])
-    # parser.add_argument('--config', default=wd / 'configs/miniseer/default_miniseer_config.yaml')
+    parser.add_argument('--config', default=wd / 'configs/miniseer/default_miniseer_config.yaml')
     # parser.add_argument('--config', default=wd / 'configs/citeseer/default_citeseer_config.yaml')
     # parser.add_argument('--config', default=wd / 'configs/cora/default_cora_config.yaml')
-    parser.add_argument('--config', default=wd / 'configs/pubmed/default_pubmed_config.yaml')
+    # parser.add_argument('--config', default=wd / 'configs/pubmed/default_pubmed_config.yaml')
     args = parser.parse_args()
 
     model_time = time.time()
@@ -321,8 +335,9 @@ if __name__ == '__main__':
 
     backend = args.backend or config.get("backend", "auto")
 
-    np.random.seed(config["seed"])
-    graph = GraphData(config["dataset"], config)
+    # create a random generator seeded with the config seed
+    seed = config.get("seed", np.random.randint(0, 2**16))
+    graph = GraphData(config["dataset"], config, rng=seed)
     model, paper_neurons, topic_neurons = create_model(graph, config)
 
     if backend == "auto":
@@ -335,42 +350,43 @@ if __name__ == '__main__':
     else:
         processes = config["processes"]
 
-    model_time = time.time() - model_time
-    print(f"Time to load dataset and create model: {model_time} seconds")
-    # save model to file for multiprocessing
-    d = {
-        'graph': graph,
-        'config': config,
-        'model': model,
-        'paper_neurons': paper_neurons,
-        'topic_neurons': topic_neurons,
-    }
-    temp = tempfile.NamedTemporaryFile(delete=False)
-    with open(temp.name, 'wb') as f:
-        pkl.dump(d, f)
     papers = []
-
-    load_time = time.time()
-    with open(temp.name, 'rb') as f:
-        pkl.load(f)
-    load_time = time.time() - load_time
-    print(f"Time to load model from pickle: {load_time} seconds")
-
     mode = config['mode']
     if mode == 'test':
         papers = graph.test_papers
     if mode == "validation":
         papers = graph.validation_papers
     n = len(papers)
-    bundles = [(paperstr, temp.name) for paperstr in papers]
-    del papers, graph, model, paper_neurons, topic_neurons  # unload to save memory
+
+    model_time = time.time() - model_time
+    print(f"Time to load dataset and create model: {model_time} seconds")
+    # save model to file for multiprocessing
+    d = {
+        'config': config,
+        'model': model,
+        'graph': graph,
+        'paper_neurons': paper_neurons,
+        'topic_neurons': topic_neurons,
+    }
+    temp = tempfile.NamedTemporaryFile(delete=False)
+
+    bundles = [(paper_id, temp.name) for paper_id in papers]
+    with open(temp.name, 'wb') as f:
+        pkl.dump(d, f)
+    del papers, model, graph, paper_neurons, topic_neurons  # unload to save memory
+
+    load_time = time.time()
+    with open(temp.name, 'rb') as f:
+        d = pkl.load(f)
+    del d
+    load_time = time.time() - load_time
+    print(f"Time to load model from pickle: {load_time} seconds")
 
     eval_time = time.time()
 
     if processes == 1:
         # single-process evaluation
-        bundles = [(paperstr, d) for paperstr in papers]
-        x = [test_paper(bundle) for bundle in tqdm.tqdm(bundles)]
+        x = [test_paper_from_pickle(bundle) for bundle in tqdm.tqdm(bundles)]
     else:
         try:  # multi-process evaluation
             x = process_map(test_paper_from_pickle, bundles, max_workers=processes, chunksize=1)  # with tqdm
@@ -385,7 +401,8 @@ if __name__ == '__main__':
 
     results, spikes = zip(*x)
     accuracy = np.sum(results) / n
-    print(f"{mode.title()} Accuracy:", accuracy)
+    print(f"{mode.title()} Accuracy: {accuracy}")
+    print(f"Correct: {np.sum(results)} / {n}")
     print(f"Total spikes:", np.sum(spikes))
     if config.get("dump_json", None):
         with open('results.json', 'a') as f:
