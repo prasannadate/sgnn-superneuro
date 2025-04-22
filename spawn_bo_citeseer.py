@@ -8,7 +8,7 @@ from omegaconf import DictConfig, OmegaConf
 import os
 import pickle
 from skopt import Optimizer, Space
-from skopt.space import Categorical
+from skopt.space import Categorical, Real
 import time
 
 # project specific pip imports
@@ -24,25 +24,15 @@ PROJECT_NAME = "GNN-BO"
 DEFAULT_CONFIG = None
 
 def solve_gnn(arg1, arg2, arg3, arg4,
-              arg5, arg6, arg7, arg8,
-              arg9, arg10, arg11, arg12,
-              arg13) -> float:
+              arg5, arg6) -> float:
     """
     Solve the GNN model with the specific BO configuration.
     """
     local_config = copy.deepcopy(DEFAULT_CONFIG)
 
     override_config = DictConfig({
-        "graph_weight": float(arg1),
-        "paper_leak": float(arg2),
-        "paper_threshold": float(arg3),
-        "topic_leak": float(arg4),
-        "topic_threshold": float(arg5),
-        "train_to_topic_weight": float(arg6),
-        "validation_to_topic_weight": float(arg7),
-        "test_to_topic_weight": float(arg7),
-        "apos": [float(x) for x in [arg8, arg9, arg10, arg11, arg12]],
-        "aneg": [float(arg13)],
+        "apos": [float(x) for x in [arg1, arg2, arg3, arg4, arg5]],
+        "aneg": [float(arg6)],
         "mode": "validation"
     })
 
@@ -84,7 +74,10 @@ def solve_gnn(arg1, arg2, arg3, arg4,
                 papers.append([paper, graph, local_config])
 
             # predictions will be a list of tuples: (paper, predicted_topic, retval)
+            start_time = time.time()
             predictions = pool.map(test_paper, papers)
+            end_time = time.time()
+            print(f"Time taken {end_time - start_time}s")
 
             if local_config["mode"] == "validation":
                 accuracy = sum(i[0] for i in predictions) / len(graph.validation_papers)
@@ -112,19 +105,12 @@ def main(config: omegaconf.DictConfig) -> None:
     DEFAULT_CONFIG = config
 
     search_space = Space([
-        Categorical([75.0, 100.0, 125.0], name="graph_weight"),
-        Categorical([0.0, 1.0], name="paper_leak"),
-        Categorical([0.5, 1.0, 1.5], name="paper_threshold"),
-        Categorical([0.0, 1.0], name="topic_leak"),
-        Categorical([0.5, 1.0, 1.5], name="topic_threshold"),
-        Categorical([0.5, 1.0, 1.5], name="train_to_topic_weight"),
-        Categorical([0.0005, 0.001, 0.005], name="validation_to_topic_weight"),
-        Categorical([0.75, 1.0, 1.25], name="apos_0"),
-        Categorical([0.25, 0.5, 0.75], name="apos_1"),
-        Categorical([0.05, 0.1, 0.15], name="apos_2"),
-        Categorical([0.005, 0.01, 0.015], name="apos_3"),
-        Categorical([0.0005, 0.001, 0.0015], name="apos_4"),
-        Categorical([0.00005, 0.0001, 0.00015], name="aneg_0"),
+        Real(0.1, 10.0, name="apos_0"),
+        Real(0.01, 1.0, name="apos_1"),
+        Real(0.01, 1.0, name="apos_2"),
+        Real(0.001, 0.1, name="apos_3"),
+        Real(0.0001,0.01, name="apos_4"),
+        Real(0.00001, 0.001, name="aneg_0"),
     ])
 
     np.random.seed(config.seed)

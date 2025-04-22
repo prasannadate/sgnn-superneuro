@@ -1,0 +1,1 @@
+python spawn_bo_pubmed.py --config ./configs/pubmed/default_pubmed_config.yaml
