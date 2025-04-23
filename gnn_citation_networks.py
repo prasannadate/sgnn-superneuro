@@ -369,7 +369,7 @@ def test_paper(x):
 
 
 if __name__ == '__main__':
-    config = yaml.safe_load(open("configs/pubmed/default_pubmed_config.yaml"))
+    config = yaml.safe_load(open("configs/cora/apos_cora_config.yaml"))
 
     np.random.seed(config["seed"])
     graph = GraphData(config["dataset"], config)
