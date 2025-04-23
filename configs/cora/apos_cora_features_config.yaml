@@ -1,7 +1,7 @@
-dataset: citeseer  # Choices: ["cora", "citeseer", "pubmed", microseer]
+dataset: cora  # Choices: ["cora", "citeseer", "pubmed", "microseer"]
 mode: validation  # Choices: ["validation", "test"]
 seed: 0
-features: 0  # Choices: [0,1]
+features: 1  # Choices: [0,1]
 paper_leak: 0.0  # Choices: [1., 10., 100., 100000.]
 paper_threshold: 1.0  # Choices: [0.25, 0.5, 0.75, 1.0, 1.5]
 train_ref: 1  # Choices: [1.0, 5.0, 10.0, 100.0, 1000.0]
@@ -20,21 +20,19 @@ validation_to_topic_weight: 0.001  # Choices: [0.001, 0.005, 0.01, 0.05, 0.1]
 validation_to_topic_delay: 1  # Choices: [1., 2., 5., 10., 20.]
 test_to_topic_weight: 0.001  # Choices: [0.001, 0.005, 0.01, 0.05, 0.1]
 test_to_topic_delay: 1  # Choices: [1., 2., 5., 10., 20.]
-paper_to_feature_weight: 0.2  # Choices: [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
-feature_to_paper_weight: 0.2  # Choices: [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
-paper_to_feature_delay: 4  # Choices: [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0]
-simtime: 10  # Choices: [5., 10., 20., 30., 40., 50., 75., 100., 150., 200.]
+paper_to_feature_weight: 2.8 # Choices: [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+feature_to_paper_weight: 2.8 # Choices: [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+paper_to_feature_delay: 1  # Choices: [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0]
+feature_to_topic:        1           # enable this block
+feature_to_topic_weight: 1        # base weight
+feature_to_topic_delay:  1           # or whatever delay makes sense
+feature_to_topic_stdp:   1           # turn STDP on if you want it plastic
+simtime: 6  # Choices: [5., 10., 20., 30., 40., 50., 75., 100., 150., 200.]
 processes: 8  # Adjust based on machine capabilities
 monitors: False
-paper_to_feature_stdp: False
-paper_to_feature_weighted: False
+paper_to_feature_stdp: True
+paper_to_feature_weighted: True
 apos: [1.0, .5, .1, .01, .001]
 aneg: [.0001]
 stdp_timesteps: 5
 dump_json: 1
-
-bo:
-  max_iterations: 1000
-  num_initial_points: 100
-  output_dir: "bo-results-citeseer"
-  save_iteration: 5
