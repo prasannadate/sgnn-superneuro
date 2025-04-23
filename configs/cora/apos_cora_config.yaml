@@ -36,3 +36,9 @@ apos: [1.0, .5, .1, .01, .001]
 aneg: [.0001]
 stdp_timesteps: 5
 dump_json: 1
+
+bo:
+  max_iterations: 1000
+  num_initial_points: 100
+  output_dir: "bo-results-cora"
+  save_iteration: 5
