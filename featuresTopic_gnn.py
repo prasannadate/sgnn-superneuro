@@ -472,7 +472,7 @@ def test_paper(x):
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config', default='configs/cora/apos_cora_config.yaml')
+    parser.add_argument('--config', default='configs/cora/apos_cora_features_config.yaml')
     args = parser.parse_args()
 
     with open(args.config, 'r') as f:
