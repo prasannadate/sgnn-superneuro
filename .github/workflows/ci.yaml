@@ -1,0 +1,41 @@
+name: "Continuous Integration"
+
+on: 
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  schedule:
+    - cron: '1 1 * * 0'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9","3.12"]
+    
+    steps:
+    - name: Checkout Code for PRs
+      if: github.event_name == 'pull_request'
+      uses: actions/checkout@v4
+    - name: Checkout Code for Push/Schedule
+      if: github.event_name != 'pull_request'
+      uses: actions/checkout@v4
+      with:
+        ref: main
+
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Install dependencies
+      run: |
+        python3 -m pip install --upgrade pip
+        pip3 install -r requirements.txt
+    - name: Run Example
+      run: |
+        python3 gnn_citation_networks.py
