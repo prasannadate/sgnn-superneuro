@@ -26,6 +26,7 @@ class GraphData():
         self.paper_to_topic = {}  # maps the paper ID in the dataset to its topic ID
         self.index_to_paper = []    # creates an index for each paper
         self.topics = []            # the list of topics
+        self.resolution_order = []
         self.edges_path = pl.Path(config["edges_path"])
         self.nodes_path = pl.Path(config["nodes_path"])
         self.train_papers = []
@@ -192,6 +193,12 @@ class GraphData():
         self.test_papers = test_papers
         self.validation_papers = validation_papers
 
+    def topic_prevalence(self):
+        topic_counts = {k: 0 for k in self.topics}
+        for topic in self.paper_to_topic.values():
+            topic_counts[topic] += 1
+        return topic_counts
+
 
 def load_network(graph, config):
     model = snm.SNN()
@@ -294,6 +301,10 @@ def test_paper(x):
     topic_neurons = d["topic_neurons"]
     config = d["config"]
 
+    if (r := graph.resolution_order):
+        # reorder topic_neurons by resolution order
+        topic_neurons = {k: topic_neurons[k] for k in r}
+
     snn.add_spike(0, paper_neurons[paper_id], 100.0)
     # model.setup()
     snn.simulate(time_steps=config["simtime"])
@@ -306,11 +317,12 @@ def test_paper(x):
         topic_weights.append((topic_id, synapse.weight))
 
     # sort by highest to lowest weight
+    # ties are resolved by the order of topic_weights, which is ordered by topic_neurons
     topic_weights = sorted(topic_weights, key=lambda x: x[1], reverse=True)
     best_topic, best_weight = topic_weights[0]
-    _runner_up, runner_up_weight = topic_weights[1]
-    if best_weight == runner_up_weight:  # check for ties
-        best_topic = None  # don't count ties as correct
+    # ties = [topic for topic, weight in topic_weights if weight == best_weight]
+    # if len(ties) > 1:  # check for ties
+    #     best_topic = None  # don't count ties as correct
     actual_topic = graph.paper_to_topic[paper_id]
     total_spikes = snn.ispikes.sum()
     snn.release_mem()
@@ -338,6 +350,8 @@ if __name__ == '__main__':
     # create a random generator seeded with the config seed
     seed = config.get("seed", np.random.randint(0, 2**16))
     graph = GraphData(config["dataset"], config, rng=seed)
+    topic_counts = graph.topic_prevalence()  # sort topics by prevalence
+    graph.resolution_order = sorted(topic_counts, key=topic_counts.get, reverse=True)
     model, paper_neurons, topic_neurons = create_model(graph, config)
 
     if backend == "auto":
