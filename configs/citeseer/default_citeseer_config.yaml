@@ -34,7 +34,7 @@ stdp_timesteps: 5
 dump_json: 1
 
 bo:
-  max_iterations: 1000
-  num_initial_points: 100
+  max_iterations: 2000
+  num_initial_points: 250
   output_dir: "bo-results-citeseer"
   save_iteration: 5

@@ -24,7 +24,9 @@ PROJECT_NAME = "GNN-BO"
 DEFAULT_CONFIG = None
 
 def solve_gnn(arg1, arg2, arg3, arg4,
-              arg5, arg6) -> float:
+              arg5, arg6, arg7, arg8,
+              arg9, arg10, arg11,
+              ) -> float:
     """
     Solve the GNN model with the specific BO configuration.
     """
@@ -33,7 +35,13 @@ def solve_gnn(arg1, arg2, arg3, arg4,
     override_config = DictConfig({
         "apos": [float(x) for x in [arg1, arg2, arg3, arg4, arg5]],
         "aneg": [float(arg6)],
-        "mode": "validation"
+        "mode": "validation",
+        "paper_threshold": float(arg7),
+        "topic_threshold": float(arg8),
+        "graph_weight": float(arg9),
+        "train_to_topic_weight": float(arg10),
+        "test_to_topic_weight": float(arg11),
+        "validation_to_topic_weight": float(arg11),
     })
 
     # print("Override config:")
@@ -105,12 +113,17 @@ def main(config: omegaconf.DictConfig) -> None:
     DEFAULT_CONFIG = config
 
     search_space = Space([
-        Real(0.1, 10.0, name="apos_0"),
-        Real(0.01, 1.0, name="apos_1"),
-        Real(0.01, 1.0, name="apos_2"),
-        Real(0.001, 0.1, name="apos_3"),
-        Real(0.0001,0.01, name="apos_4"),
-        Real(0.00001, 0.001, name="aneg_0"),
+        Real(0.01, 100.0, name="apos_0"),
+        Real(0.001, 10.0, name="apos_1"),
+        Real(0.001, 1.00, name="apos_2"),
+        Real(0.0001, 1.0, name="apos_3"),
+        Real(0.00001,0.1, name="apos_4"),
+        Real(0.000001, 0.01, name="aneg_0"),
+        Real(0.00001, 10.0, name="paper_threshold"),
+        Real(0.00001, 10.0, name="topic_threshold"),
+        Real(0.00001, 100.0, name="graph_weight"),
+        Real(0.00001, 10.0, name="train_to_topic_weight"),
+        Real(0.00001, 10.0, name="test_to_topic_weight"),
     ])
 
     np.random.seed(config.seed)

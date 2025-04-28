@@ -3,7 +3,7 @@
 #SBATCH   --job-name=citeseer-bo        # name the job
 #SBATCH   --output=citesser-bo-%j.out   # write stdout/stderr   to named file
 #SBATCH   --error=citeseer-bo-%j.err      
-#SBATCH   --time=1-0:00:00              # Run for max of 02 hrs, 00 mins, 00 secs
+#SBATCH   --time=2-0:00:00              # Run for max of 02 hrs, 00 mins, 00 secs
 #SBATCH   --nodes=1                     # Request N nodes
 #SBATCH   --cpus-per-task=18            # Request n   cores per node
 #SBATCH   --mem-per-cpu=4GB             # Request nGB RAM per core

@@ -1,8 +1,8 @@
 #!/bin/bash
 #SBATCH   --partition=normal            # submit   to the normal(default) partition
-#SBATCH   --job-name=cora-bo        # name the job
-#SBATCH   --output=cora-bo-%j.out   # write stdout/stderr   to named file
-#SBATCH   --error=cora-bo-%j.err      
+#SBATCH   --job-name=citeseer-real-bo-features        # name the job
+#SBATCH   --output=citesser-real-bo-features-%j.out   # write stdout/stderr   to named file
+#SBATCH   --error=citeseer-real-bo-features-%j.err      
 #SBATCH   --time=2-0:00:00              # Run for max of 02 hrs, 00 mins, 00 secs
 #SBATCH   --nodes=1                     # Request N nodes
 #SBATCH   --cpus-per-task=18            # Request n   cores per node
@@ -33,4 +33,4 @@ unset __conda_setup
 
 conda activate sgnn-sparse
 
-python spawn_bo_cora.py --config ./configs/cora/apos_cora_config.yaml
+python featuresTopic_gnn_bo_citeseer.py --config ./configs/citeseer/default_citeseer_features_config.yaml

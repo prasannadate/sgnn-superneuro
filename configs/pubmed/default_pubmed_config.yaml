@@ -1,5 +1,5 @@
 dataset: pubmed  # Choices: ["cora", "citeseer", "pubmed", "microseer"]
-mode: test  # Choices: ["validation", "test"]
+mode: validation  # Choices: ["validation", "test"]
 seed: 0
 features: 0  # Choices: [0,1]
 paper_leak: 0.0  # Choices: [1., 10., 100., 100000.]
@@ -34,7 +34,7 @@ stdp_timesteps: 5
 dump_json: 1
 
 bo:
-  max_iterations: 1000
-  num_initial_points: 100
+  max_iterations: 2000
+  num_initial_points: 250
   output_dir: "bo-results-pubmed"
   save_iteration: 5
