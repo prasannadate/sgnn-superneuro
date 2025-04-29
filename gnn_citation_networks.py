@@ -350,9 +350,12 @@ if __name__ == '__main__':
     # create a random generator seeded with the config seed
     seed = config.get("seed", np.random.randint(0, 2**16))
     graph = GraphData(config["dataset"], config, rng=seed)
-    topic_counts = graph.topic_prevalence()  # sort topics by prevalence
-    graph.resolution_order = sorted(topic_counts, key=topic_counts.get, reverse=True)
     model, paper_neurons, topic_neurons = create_model(graph, config)
+    # topic_counts = graph.topic_prevalence()  # calculate topic counts
+    # graph.resolution_order = sorted(topic_counts, key=topic_counts.get, reverse=True)  # sort topics by prevalence
+    # graph.resolution_order = reversed(list(topic_neurons))  # sort topics by reverse load order
+    graph.resolution_order = list(topic_neurons)  # sort topics by load order
+
 
     if backend == "auto":
         backend = model.recommend(config["simtime"])
