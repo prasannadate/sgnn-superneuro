@@ -320,7 +320,7 @@ def test_paper(x):
     # ties are resolved by the order of topic_weights, which is ordered by topic_neurons
     topic_weights = sorted(topic_weights, key=lambda x: x[1], reverse=True)
     best_topic, best_weight = topic_weights[0]
-    # ties = [topic for topic, weight in topic_weights if weight == best_weight]
+    ties = [topic for topic, weight in topic_weights if weight == best_weight]
     # if len(ties) > 1:  # check for ties
     #     best_topic = None  # don't count ties as correct
     actual_topic = graph.paper_to_topic[paper_id]
@@ -328,8 +328,26 @@ def test_paper(x):
     snn.release_mem()
     del snn, graph
     del d
-    match = actual_topic == best_topic
-    return match, total_spikes
+    # match = actual_topic == best_topic
+    ret = (actual_topic, ties)
+    return ret, total_spikes
+
+
+def score(answers, topics):
+    tp, tn, fp, fn = 0, 0, 0, 0
+    for actual, guesses in answers:
+        for topic in topics:
+            if topic == actual:
+                if actual in guesses:
+                    tp += 1
+                else:
+                    fn += 1
+            else:
+                if topic in guesses:
+                    fp += 1
+                else:
+                    tn += 1
+    return tp, tn, fp, fn
 
 
 if __name__ == '__main__':
@@ -352,10 +370,10 @@ if __name__ == '__main__':
     graph = GraphData(config["dataset"], config, rng=seed)
     model, paper_neurons, topic_neurons = create_model(graph, config)
     # topic_counts = graph.topic_prevalence()  # calculate topic counts
-    # graph.resolution_order = sorted(topic_counts, key=topic_counts.get, reverse=True)  # sort topics by prevalence
-    # graph.resolution_order = reversed(list(topic_neurons))  # sort topics by reverse load order
-    graph.resolution_order = list(topic_neurons)  # sort topics by load order
-
+    # resolution_order = sorted(topic_counts, key=topic_counts.get, reverse=True)  # sort topics by prevalence
+    # resolution_order = reversed(list(topic_neurons))  # sort topics by reverse load order
+    resolution_order = list(topic_neurons)  # sort topics by load order
+    graph.resolution_order = resolution_order
 
     if backend == "auto":
         backend = model.recommend(config["simtime"])
@@ -417,9 +435,21 @@ if __name__ == '__main__':
     print(f"Evaluation time: {eval_time} seconds")
 
     results, spikes = zip(*x)
-    accuracy = np.sum(results) / n
-    print(f"{mode.title()} Accuracy: {accuracy}")
-    print(f"Correct: {np.sum(results)} / {n}")
+    # accuracy = np.sum(results) / n
+    tp, tn, fp, fn = score(results, resolution_order)
+    correct = np.sum([ans in guesses for ans, guesses in results])
+    perfect = np.sum([set([ans]) == set(guesses) for ans, guesses in results])
+    accuracy = (tp + tn) / (tp + tn + fp + fn)
+    precision = tp / (tp + fp)
+    recall = tp / (tp + fn)
+    f1 = 2 * (precision * recall) / (precision + recall)
+    print(f"{mode.title()} results:")
+    print(f"Recall:    {recall:.3f}")
+    print(f"Precision: {precision:.3f}")
+    print(f"Accuracy:  {accuracy:.3f}")
+    print(f"F1:        {f1:.3f}")
+    print(f"Positives: {correct} / {n} ({correct / n * 100:.2f}%)")
+    print(f"Perfect:   {perfect} / {n} ({perfect / n * 100:.2f}%)")
     print(f"Total spikes:", np.sum(spikes))
     if config.get("dump_json", None):
         with open('results.json', 'a') as f:
