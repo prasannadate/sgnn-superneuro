@@ -106,7 +106,25 @@ def parse_args() -> Tuple[argparse.Namespace, List[str]]:
         List[str]: List of unknown arguments.
     """
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", type=str, required=False, help="Path to the input config file", default="/home/ssnyde9/dev/sgnn-superneuro/configs/default_cora_bo_no_features_config.yaml")
+    parser.add_argument(
+        "--config",
+        type=str,
+        required=False,
+        help="Path to the input config file",
+        default="./configs/citeseer/default_citeseer_config.yaml"
+    )
+    parser.add_argument(
+        "--test-bo",
+        action="store_true",
+        help="Run the BO in testing mode"
+    )
+    parser.add_argument(
+        "--project-name",
+        type=str,
+        required=False,
+        help="Name of the project",
+        default="gnn-bo"
+    )   
     args, unknown_args = parser.parse_known_args()
     return args, unknown_args
 
