@@ -10,6 +10,7 @@ import pickle
 from skopt import Optimizer, Space
 from skopt.space import Categorical, Real
 import time
+import json
 
 # project specific pip imports
 from gnn_citation_networks import GraphData, test_paper
@@ -35,7 +36,7 @@ def solve_gnn(arg1, arg2, arg3, arg4,
     override_config = DictConfig({
         "apos": [float(x) for x in [arg1, arg2, arg3, arg4, arg5]],
         "aneg": [float(arg6)],
-        "mode": "validation",
+        "mode": "test",
         "paper_threshold": float(arg7),
         "topic_threshold": float(arg8),
         "graph_weight": float(arg9),
@@ -45,8 +46,8 @@ def solve_gnn(arg1, arg2, arg3, arg4,
     })
 
 
-    # print("Override config:")
-    # print(json.dumps(OmegaConf.to_container(override_config), indent=4))
+    print("Override config:")
+    print(json.dumps(OmegaConf.to_container(override_config), indent=4))
 
     # Extract keys from both configs
     baseline_keys = set(OmegaConf.to_container(local_config, resolve=True).keys())
@@ -91,7 +92,7 @@ def solve_gnn(arg1, arg2, arg3, arg4,
             if local_config["mode"] == "validation":
                 accuracy = sum(i[0] for i in predictions) / len(graph.validation_papers)
                 print("Validation Accuracy:", accuracy)
-            elif local_config["mode"] == "testing":
+            elif local_config["mode"] == "test":
                 accuracy = sum(i[0] for i in predictions) / len(graph.test_papers)
                 print("Testing Accuracy:", accuracy)
 
@@ -113,6 +114,7 @@ def main(config: omegaconf.DictConfig) -> None:
     global DEFAULT_CONFIG
     DEFAULT_CONFIG = config
 
+
     search_space = Space([
         Real(0.01, 100.0, name="apos_0"),
         Real(0.001, 10.0, name="apos_1"),
@@ -128,6 +130,11 @@ def main(config: omegaconf.DictConfig) -> None:
     ])
 
     np.random.seed(config.seed)
+
+    params = [70.30311793962203, 4.901475270138933, 0.46904442321148543, 0.4641324948794373, 0.09531826632733534, 0.004887156753836138, 4.519094932200007, 1e-05, 63.75145491431443, 4.333442576560681, 1e-05]
+    acc = solve_gnn(*params)
+    print(acc)
+    return
 
     num_iterations: int = config.bo.max_iterations
     num_initial_points: int = config.bo.num_initial_points

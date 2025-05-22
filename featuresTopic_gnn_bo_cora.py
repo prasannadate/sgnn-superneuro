@@ -505,7 +505,7 @@ def solve_gnn(arg1, arg2, arg3, arg4,
     override_config = DictConfig({
         "apos": [float(x) for x in [arg1, arg2, arg3, arg4, arg5]],
         "aneg": [float(arg6)],
-        "mode": "validation",
+        "mode": "test",
         "paper_threshold": float(arg7),
         "topic_threshold": float(arg8),
         "feature_threshold": float(arg9),
@@ -519,8 +519,8 @@ def solve_gnn(arg1, arg2, arg3, arg4,
 
     })
 
-    # print("Override config:")
-    # print(json.dumps(OmegaConf.to_container(override_config), indent=4))
+    print("Override config:")
+    print(json.dumps(OmegaConf.to_container(override_config), indent=4))
 
     # Extract keys from both configs
     baseline_keys = set(OmegaConf.to_container(local_config, resolve=True).keys())
@@ -565,7 +565,7 @@ def solve_gnn(arg1, arg2, arg3, arg4,
             if local_config["mode"] == "validation":
                 accuracy = sum(i[0] for i in predictions) / len(graph.validation_papers)
                 print("Validation Accuracy:", accuracy)
-            elif local_config["mode"] == "testing":
+            elif local_config["mode"] == "test":
                 accuracy = sum(i[0] for i in predictions) / len(graph.test_papers)
                 print("Testing Accuracy:", accuracy)
 
@@ -608,6 +608,11 @@ def main(config: omegaconf.DictConfig) -> None:
 
     num_iterations: int = config.bo.max_iterations
     num_initial_points: int = config.bo.num_initial_points
+
+    params = [24.905509600092667, 4.933065816217296, 0.809164283334176, 0.7610243802440656, 0.08806205375810323, 0.01, 7.574330780896566, 1e-05, 0.08210858786652499, 26.804150572247252, 10.0, 1e-05, 0.11507558764643261, 3.9484717211840157]
+    acc = solve_gnn(*params)
+    print(acc)
+    return
 
     optimizer = Optimizer(
         dimensions=search_space,

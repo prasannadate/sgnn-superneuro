@@ -10,6 +10,7 @@ import pickle
 from skopt import Optimizer, Space
 from skopt.space import Categorical, Real
 import time
+import json
 
 # project specific pip imports
 from gnn_citation_networks import GraphData, test_paper
@@ -35,7 +36,7 @@ def solve_gnn(arg1, arg2, arg3, arg4,
     override_config = DictConfig({
         "apos": [float(x) for x in [arg1, arg2, arg3, arg4, arg5]],
         "aneg": [float(arg6)],
-        "mode": "validation",
+        "mode": "test",
         "paper_threshold": float(arg7),
         "topic_threshold": float(arg8),
         "graph_weight": float(arg9),
@@ -44,8 +45,8 @@ def solve_gnn(arg1, arg2, arg3, arg4,
         "validation_to_topic_weight": float(arg11),
     })
 
-    # print("Override config:")
-    # print(json.dumps(OmegaConf.to_container(override_config), indent=4))
+    print("Override config:")
+    print(json.dumps(OmegaConf.to_container(override_config), indent=4))
 
     # Extract keys from both configs
     baseline_keys = set(OmegaConf.to_container(local_config, resolve=True).keys())
@@ -90,7 +91,7 @@ def solve_gnn(arg1, arg2, arg3, arg4,
             if local_config["mode"] == "validation":
                 accuracy = sum(i[0] for i in predictions) / len(graph.validation_papers)
                 print("Validation Accuracy:", accuracy)
-            elif local_config["mode"] == "testing":
+            elif local_config["mode"] == "test":
                 accuracy = sum(i[0] for i in predictions) / len(graph.test_papers)
                 print("Testing Accuracy:", accuracy)
 
@@ -108,6 +109,8 @@ def main(config: omegaconf.DictConfig) -> None:
     Args:
         config (omegaconf.DictConfig): Merged configuration.
     """
+
+
 
     global DEFAULT_CONFIG
     DEFAULT_CONFIG = config
@@ -130,6 +133,11 @@ def main(config: omegaconf.DictConfig) -> None:
 
     num_iterations: int = config.bo.max_iterations
     num_initial_points: int = config.bo.num_initial_points
+
+    params = [95.03749708989069, 0.001, 0.9547480690249596, 0.7786847405041152, 0.05460407192286922, 0.0015245344060444586, 3.780834157058594, 2.974017745033285, 100.0, 8.816039206772915, 1e-05]
+    acc = solve_gnn(*params)
+    print(acc)
+    return
 
     optimizer = Optimizer(
         dimensions=search_space,

@@ -358,7 +358,6 @@ def load_network(graph, config):
     if config["features"] == 1:
         for node in graph.graph.nodes:
             if (node not in graph.features.keys()):
-                print("No features for node: ", node)
                 continue
             paper_id = paper_neurons[node]
             for i, feature_value in enumerate(graph.features[node]):
@@ -505,7 +504,7 @@ def solve_gnn(arg1, arg2, arg3, arg4,
     override_config = DictConfig({
         "apos": [float(x) for x in [arg1, arg2, arg3, arg4, arg5]],
         "aneg": [float(arg6)],
-        "mode": "validation",
+        "mode": "test",
         "paper_threshold": float(arg7),
         "topic_threshold": float(arg8),
         "feature_threshold": float(arg9),
@@ -519,8 +518,10 @@ def solve_gnn(arg1, arg2, arg3, arg4,
 
     })
 
-    # print("Override config:")
-    # print(json.dumps(OmegaConf.to_container(override_config), indent=4))
+    print(json.dumps(OmegaConf.to_container(override_config), indent=4))
+
+    print("Override config:")
+    print(json.dumps(OmegaConf.to_container(override_config), indent=4))
 
     # Extract keys from both configs
     baseline_keys = set(OmegaConf.to_container(local_config, resolve=True).keys())
@@ -565,7 +566,7 @@ def solve_gnn(arg1, arg2, arg3, arg4,
             if local_config["mode"] == "validation":
                 accuracy = sum(i[0] for i in predictions) / len(graph.validation_papers)
                 print("Validation Accuracy:", accuracy)
-            elif local_config["mode"] == "testing":
+            elif local_config["mode"] == "test":
                 accuracy = sum(i[0] for i in predictions) / len(graph.test_papers)
                 print("Testing Accuracy:", accuracy)
 
@@ -608,6 +609,11 @@ def main(config: omegaconf.DictConfig) -> None:
 
     num_iterations: int = config.bo.max_iterations
     num_initial_points: int = config.bo.num_initial_points
+
+    params = [20.85558511276137, 0.001, 0.19111113793461285, 0.0001, 1e-05, 0.01, 1e-05, 10.0, 1e-05, 100.0, 10.0, 1e-05, 1.5800413197524448, 10.0]
+    acc = solve_gnn(*params)
+    print(acc)
+    return
 
     optimizer = Optimizer(
         dimensions=search_space,
