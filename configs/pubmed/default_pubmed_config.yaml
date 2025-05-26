@@ -1,5 +1,5 @@
 dataset: pubmed  # Choices: ["cora", "citeseer", "pubmed", "microseer"]
-mode: test  # Choices: ["validation", "test"]
+mode: validation  # Choices: ["validation", "test"]
 seed: 0
 features: 0  # Choices: [0,1]
 paper_leak: 0.0  # Choices: [1., 10., 100., 100000.]
