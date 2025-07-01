@@ -1,7 +1,7 @@
 dataset: cora  # Choices: ["cora", "citeseer", "pubmed", "microseer"]
-mode: test  # Choices: ["validation", "test"]
+mode: validation  # Choices: ["validation", "test"]
 seed: 0
-features: 0  # Choices: [0,1]
+features: 1  # Choices: [0,1]
 paper_leak: 0.0  # Choices: [1., 10., 100., 100000.]
 paper_threshold: 1.0  # Choices: [0.25, 0.5, 0.75, 1.0, 1.5]
 train_ref: 1  # Choices: [1.0, 5.0, 10.0, 100.0, 1000.0]
@@ -27,11 +27,11 @@ feature_to_topic:        1           # enable this block
 feature_to_topic_weight: 1        # base weight
 feature_to_topic_delay:  1 
 feature_to_topic_stdp:   1 
-simtime: 6  # Choices: [5., 10., 20., 30., 40., 50., 75., 100., 150., 200.]
+simtime: 10  # Choices: [5., 10., 20., 30., 40., 50., 75., 100., 150., 200.]
 processes: 8  # Adjust based on machine capabilities
 monitors: False
-paper_to_feature_stdp: False
-paper_to_feature_weighted: False
+paper_to_feature_stdp: True
+paper_to_feature_weighted: True
 apos: [1.0, .5, .1, .01, .001]
 aneg: [.0001]
 stdp_timesteps: 5
@@ -40,5 +40,5 @@ dump_json: 1
 bo:
   max_iterations: 2000
   num_initial_points: 250
-  output_dir: "bo-results-cora"
+  output_dir: "bo-results-coraTie"
   save_iteration: 5
