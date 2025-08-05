@@ -9,4 +9,5 @@ superneuromat>=2.1.0
 pandas
 tabulate
 wandb
+wrapt
 tqdm
