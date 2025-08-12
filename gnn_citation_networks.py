@@ -252,7 +252,7 @@ class GraphData():
         self.validation_papers = validation_papers
 
 def load_network(graph, config):
-    model = snm.NeuromorphicModel()
+    model = snm.SNN()
     # Read paper to paper edge list
     topic_neurons = {}
     # Create paper neurons
@@ -263,16 +263,16 @@ def load_network(graph, config):
         if (node not in graph.paper_to_topic.keys()):
             continue
         if node in graph.train_papers:
-            neuron = model.create_neuron(threshold=config["paper_threshold"], leak=config["paper_leak"], refractory_period=config["train_ref"])
+            neuron = model.create_neuron(threshold=config["paper_threshold"], leak=config["paper_leak"], refractory_period=config["train_ref"]).idx
         elif node in graph.validation_papers:
-            neuron = model.create_neuron(threshold=config["paper_threshold"], leak=config["paper_leak"], refractory_period=config["validation_ref"])
+            neuron = model.create_neuron(threshold=config["paper_threshold"], leak=config["paper_leak"], refractory_period=config["validation_ref"]).idx
         elif node in graph.test_papers:
-            neuron = model.create_neuron(threshold=config["paper_threshold"], leak=config["paper_leak"], refractory_period=config["test_ref"])
+            neuron = model.create_neuron(threshold=config["paper_threshold"], leak=config["paper_leak"], refractory_period=config["test_ref"]).idx
         paper_neurons[node] = neuron
 
 
     for t in graph.topics:
-        neuron = model.create_neuron(threshold=config["topic_threshold"], leak=config["topic_leak"], refractory_period=0)
+        neuron = model.create_neuron(threshold=config["topic_threshold"], leak=config["topic_leak"], refractory_period=0).idx
         topic_neurons[t] = neuron
 
     for edge in graph.graph.edges:
@@ -284,7 +284,7 @@ def load_network(graph, config):
         variations = (1.0 + np.random.normal(0, variation_scale))
         graph_delay = 1
         model.create_synapse(pre, post, weight=config["graph_weight"], delay=config["graph_delay"], stdp_enabled=False)
-        model.create_synapse(post, pre, weight=config["graph_weight"], delay=config["graph_delay"], stdp_enabled=False)
+        model.create_synapse(post, pre, weight=config["graph_weight"], delay=config["graph_delay"], stdp_enabled=False, exist="dontadd")
 
     for paper in graph.train_papers:
         paper_neuron = paper_neurons[paper]
@@ -327,9 +327,8 @@ def test_paper(x):
     paper_id = paper_neurons[paper]
     model.add_spike(0, paper_id, 100.0)
     timesteps = config["simtime"]
-    model.stdp_setup(time_steps=config["stdp_timesteps"],
-        Apos=config["apos"], Aneg=config["aneg"] * config["stdp_timesteps"], negative_update=True, positive_update=True)
-    model.setup()
+    model.stdp_setup(Apos=config["apos"], Aneg=config["aneg"] * config["stdp_timesteps"], negative_update=True, positive_update=True)
+    # model.setup()
 #     with open("pre_sim_model.pkl", "wb") as f:
 #         pickle.dump(model, f)
     model.simulate(time_steps=timesteps)
@@ -367,7 +366,7 @@ def test_paper(x):
 
 
 if __name__ == '__main__':
-    config = yaml.safe_load(open("configs/citeseer/default_citeseer_config.yaml"))
+    config = yaml.safe_load(open("configs/pubmed/default_pubmed_config.yaml"))
 
     np.random.seed(config["seed"])
     graph = GraphData(config["dataset"], config)
