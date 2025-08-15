@@ -363,6 +363,9 @@ if __name__ == '__main__':
     with open(args.config, 'r') as f:
         config = yaml.load(f)
 
+    print(f"Loaded config from {args.config}")
+    print(f"This is the {config['dataset']} dataset over the {config['mode']} split.")
+
     backend = args.backend or config.get("backend", "auto")
 
     # create a random generator seeded with the config seed
@@ -408,6 +411,9 @@ if __name__ == '__main__':
     bundles = [(paper_id, temp.name) for paper_id in papers]
     with open(temp.name, 'wb') as f:
         pkl.dump(d, f)
+    with open('model.json', 'w') as f:
+        model.saveas_json(f, array_representation="json-native")
+    model.pretty_print(10)
     del papers, model, graph, paper_neurons, topic_neurons  # unload to save memory
 
     load_time = time.time()
