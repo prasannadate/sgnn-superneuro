@@ -33,6 +33,8 @@ class GraphData():
         self.validation_papers = []
         self.test_papers = []
 
+        self.snn = snm.SNN()
+
         if rng is None:
             self.seed = np.random.randint(0, 2**16)
             self.rng = np.random.default_rng(self.seed)
@@ -199,85 +201,68 @@ class GraphData():
             topic_counts[topic] += 1
         return topic_counts
 
+    def configure_model(self):
+        self.snn.apos = self.config["apos"]
+        self.snn.aneg = self.config["aneg"]
 
-def load_network(graph, config):
-    model = snm.SNN()
-    # Read paper to paper edge list
-    topic_neurons = {}
-    # Create paper neurons
-    paper_neurons = {}
-    i = 0
-    variation_scale = .01
-    for node in graph.graph.nodes:
-        if (node not in graph.paper_to_topic.keys()):
-            continue
-        if node in graph.train_papers:
-            neuron = model.create_neuron(threshold=config["paper_threshold"], leak=config["paper_leak"], refractory_period=config["train_ref"])
-        elif node in graph.validation_papers:
-            neuron = model.create_neuron(threshold=config["paper_threshold"], leak=config["paper_leak"], refractory_period=config["validation_ref"])
-        elif node in graph.test_papers:
-            neuron = model.create_neuron(threshold=config["paper_threshold"], leak=config["paper_leak"], refractory_period=config["test_ref"])
-        # paper_neurons[node] = neuron
-        paper_neurons[node] = neuron.idx
+    def make_network(self):
+        model = self.snn
+        # Read paper to paper edge list
+        self.topic_neurons = topic_neurons = {}
+        # Create paper neurons
+        self.paper_neurons = paper_neurons = {}
+        # create sets for faster __contains__ lookup
+        train_papers = set(self.train_papers)
+        validation_papers = set(self.validation_papers)
+        test_papers = set(self.test_papers)
 
-    for t in graph.topics:
-        neuron = model.create_neuron(threshold=config["topic_threshold"], leak=config["topic_leak"], refractory_period=0)
-        # topic_neurons[t] = neuron
-        topic_neurons[t] = neuron.idx
+        c = self.config
 
-    for edge in graph.graph.edges:
-        paper, cited = edge
-        if (paper not in graph.paper_to_topic.keys() or cited not in graph.paper_to_topic.keys()):
-            continue
-        pre = paper_neurons[paper]
-        post = paper_neurons[cited]
-        if pre == post:
-            continue
-        graph_weight = 100.0
-        variations = (1.0 + graph.rng.normal(0, variation_scale))
-        graph_delay = 1
-        model.create_synapse(pre, post, weight=config["graph_weight"], delay=config["graph_delay"], stdp_enabled=False)
-        model.create_synapse(post, pre, weight=config["graph_weight"], delay=config["graph_delay"], stdp_enabled=False)
+        for node in self.graph.nodes:
+            if (node not in self.paper_to_topic.keys()):
+                continue
+            if node in train_papers:
+                neuron = model.create_neuron(threshold=c["paper_threshold"], leak=c["paper_leak"], refractory_period=c["train_ref"])
+            elif node in validation_papers:
+                neuron = model.create_neuron(threshold=c["paper_threshold"], leak=c["paper_leak"], refractory_period=c["validation_ref"])
+            elif node in test_papers:
+                neuron = model.create_neuron(threshold=c["paper_threshold"], leak=c["paper_leak"], refractory_period=c["test_ref"])
+            paper_neurons[node] = neuron.idx
 
-    for paper in graph.train_papers:
-        paper_neuron = paper_neurons[paper]
-        topic_neuron = topic_neurons[graph.paper_to_topic[paper]]
-        train_to_topic_w = 1.0
-        train_to_topic_w *= (1.0 + graph.rng.normal(0, variation_scale))
-        train_to_topic_d = 1
-        model.create_synapse(paper_neuron, topic_neuron, weight=config["train_to_topic_weight"], delay=config["train_to_topic_delay"], stdp_enabled=False)
-        model.create_synapse(topic_neuron, paper_neuron, weight=config["train_to_topic_weight"], delay=config["train_to_topic_delay"], stdp_enabled=False)
+        for t in self.topics:
+            neuron = model.create_neuron(threshold=c["topic_threshold"], leak=c["topic_leak"], refractory_period=0)
+            topic_neurons[t] = neuron.idx
 
-    for paper in graph.validation_papers:
-        for topic in graph.topics:
+        for edge in self.graph.edges:
+            paper, cited = edge
+            if (paper not in self.paper_to_topic.keys() or cited not in self.paper_to_topic.keys()):
+                continue
+            pre = paper_neurons[paper]
+            post = paper_neurons[cited]
+            if pre == post:
+                continue
+            model.create_synapse(pre, post, weight=c["graph_weight"], delay=c["graph_delay"], stdp_enabled=False)
+            model.create_synapse(post, pre, weight=c["graph_weight"], delay=c["graph_delay"], stdp_enabled=False)
+
+        for paper in self.train_papers:
             paper_neuron = paper_neurons[paper]
-            topic_neuron = topic_neurons[topic]
+            topic_neuron = topic_neurons[self.paper_to_topic[paper]]
+            model.create_synapse(paper_neuron, topic_neuron, weight=c["train_to_topic_weight"], delay=c["train_to_topic_delay"], stdp_enabled=False)
+            model.create_synapse(topic_neuron, paper_neuron, weight=c["train_to_topic_weight"], delay=c["train_to_topic_delay"], stdp_enabled=False)
 
-            validation_to_topic_w = 0.001
-            validation_to_topic_w *= (1.0 + graph.rng.normal(0, variation_scale))
-            validation_to_topic_d = 1
-            model.create_synapse(paper_neuron, topic_neuron, stdp_enabled=True, weight=config["validation_to_topic_weight"], delay=config["validation_to_topic_delay"])
-            model.create_synapse(topic_neuron, paper_neuron, stdp_enabled=True, weight=config["validation_to_topic_weight"], delay=config["validation_to_topic_delay"])
+        for paper in self.validation_papers:
+            for topic in self.topics:
+                paper_neuron = paper_neurons[paper]
+                topic_neuron = topic_neurons[topic]
+                model.create_synapse(paper_neuron, topic_neuron, stdp_enabled=True, weight=c["validation_to_topic_weight"], delay=c["validation_to_topic_delay"])
+                model.create_synapse(topic_neuron, paper_neuron, stdp_enabled=True, weight=c["validation_to_topic_weight"], delay=c["validation_to_topic_delay"])
 
-    for paper in graph.test_papers:
-        for topic in graph.topics:
-            paper_neuron = paper_neurons[paper]
-            topic_neuron = topic_neurons[topic]
-            test_to_topic_w = 0.001
-            test_to_topic_w *= (1.0 + graph.rng.normal(0, variation_scale))
-            test_to_topic_d = 1
-            model.create_synapse(paper_neuron, topic_neuron, stdp_enabled=True, weight=config["test_to_topic_weight"], delay=config["test_to_topic_delay"])
-            model.create_synapse(topic_neuron, paper_neuron, stdp_enabled=True, weight=config["test_to_topic_weight"], delay=config["test_to_topic_delay"])
-
-    return paper_neurons, topic_neurons, model
-
-
-def create_model(graph, config):
-    paper_neurons, topic_neurons, model = load_network(graph, config)
-    model.apos = config["apos"]
-    model.aneg = config["aneg"]
-    model.backend = config.get("backend", "auto")
-    return model, paper_neurons, topic_neurons
+        for paper in self.test_papers:
+            for topic in self.topics:
+                paper_neuron = paper_neurons[paper]
+                topic_neuron = topic_neurons[topic]
+                model.create_synapse(paper_neuron, topic_neuron, stdp_enabled=True, weight=c["test_to_topic_weight"], delay=c["test_to_topic_delay"])
+                model.create_synapse(topic_neuron, paper_neuron, stdp_enabled=True, weight=c["test_to_topic_weight"], delay=c["test_to_topic_delay"])
 
 
 def test_paper_from_pickle(x):
@@ -287,19 +272,11 @@ def test_paper_from_pickle(x):
     return test_paper((paper_id, d))
 
 
-# def get_synapse(model, pre_id, post_id):
-#     for i, (pre, post) in enumerate(zip(model.pre_synaptic_neuron_ids, model.post_synaptic_neuron_ids)):
-#         if pre_id == pre and post_id == post:
-#             return i
-
-
 def test_paper(x):
-    paper_id, d = x
-    snn = d["model"]
-    graph = d["graph"]
-    paper_neurons = d["paper_neurons"]
-    topic_neurons = d["topic_neurons"]
-    config = d["config"]
+    paper_id, graph = x
+    snn = graph.snn
+    paper_neurons = graph.paper_neurons
+    topic_neurons = graph.topic_neurons
 
     if (r := graph.resolution_order):
         # reorder topic_neurons by resolution order
@@ -307,7 +284,7 @@ def test_paper(x):
 
     snn.add_spike(0, paper_neurons[paper_id], 100.0)
     # model.setup()
-    snn.simulate(time_steps=config["simtime"])
+    snn.simulate(time_steps=graph.config["simtime"])
 
     # Analyze the weights between the test paper neuron and topic neurons
     topic_weights = []
@@ -327,7 +304,6 @@ def test_paper(x):
     total_spikes = snn.ispikes.sum()
     snn.release_mem()
     del snn, graph
-    del d
     # match = actual_topic == best_topic
     ret = (actual_topic, ties)
     return ret, total_spikes
@@ -370,17 +346,18 @@ if __name__ == '__main__':
 
     # create a random generator seeded with the config seed
     seed = config.get("seed", np.random.randint(0, 2**16))
-    graph = GraphData(config["dataset"], config, rng=seed)
-    model, paper_neurons, topic_neurons = create_model(graph, config)
+    graph = GraphData(name=config["dataset"], config=config, rng=seed)
+    graph.make_network()
+    graph.configure_model()
     # topic_counts = graph.topic_prevalence()  # calculate topic counts
     # resolution_order = sorted(topic_counts, key=topic_counts.get, reverse=True)  # sort topics by prevalence
-    # resolution_order = reversed(list(topic_neurons))  # sort topics by reverse load order
-    resolution_order = list(topic_neurons)  # sort topics by load order
+    # resolution_order = reversed(list(graph.topic_neurons))  # sort topics by reverse load order
+    resolution_order = list(graph.topic_neurons)  # sort topics by load order
     graph.resolution_order = resolution_order
 
     if backend == "auto":
-        backend = model.recommend(config["simtime"])
-        model.backend = backend
+        backend = graph.snn.recommend(config["simtime"])
+        graph.snn.backend = backend
     if backend == "gpu":
         processes = config.get("gpu_processes", 1)
     elif config.get("processes", "auto") == "auto":
@@ -399,22 +376,15 @@ if __name__ == '__main__':
     model_time = time.time() - model_time
     print(f"Time to load dataset and create model: {model_time} seconds")
     # save model to file for multiprocessing
-    d = {
-        'config': config,
-        'model': model,
-        'graph': graph,
-        'paper_neurons': paper_neurons,
-        'topic_neurons': topic_neurons,
-    }
     temp = tempfile.NamedTemporaryFile(delete=False)
 
     bundles = [(paper_id, temp.name) for paper_id in papers]
     with open(temp.name, 'wb') as f:
-        pkl.dump(d, f)
+        pkl.dump(graph, f)
     with open('model.json', 'w') as f:
-        model.saveas_json(f, array_representation="json-native")
-    model.pretty_print(10)
-    del papers, model, graph, paper_neurons, topic_neurons  # unload to save memory
+        graph.snn.saveas_json(f, array_representation="json-native")
+    graph.snn.pretty_print(10)
+    del papers, graph  # unload data and SNN to save memory
 
     load_time = time.time()
     with open(temp.name, 'rb') as f:
