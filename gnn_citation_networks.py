@@ -8,6 +8,7 @@ import pickle as pkl
 import pathlib as pl
 from multiprocessing import Pool
 from dataclasses import dataclass, field
+from itertools import product
 
 import tqdm
 import numpy as np
@@ -18,6 +19,10 @@ from tqdm.contrib.concurrent import process_map
 
 wd = pl.Path(__file__).parent.absolute()  # get the Path() of this python file
 
+defaultconfig_path = wd / 'configs/default_config.yaml'
+
+default_config = yaml.load(open(defaultconfig_path, 'r'))
+
 
 class GraphData():
     def __init__(self, name, config, rng=None):
@@ -26,6 +31,9 @@ class GraphData():
         self.paper_to_topic = {}  # maps the paper ID in the dataset to its topic ID
         self.index_to_paper = []    # creates an index for each paper
         self.topics = []            # the list of topics
+        self.paper_featurecount = {}  # keyed on paper ID, value is the number of features it has
+        self.feature_papercount = {}  # keyed on idx of feature in feature vector, value is the number of papers that have that feature
+        self.feature_to_neuron_id = {}  # keyed on idx of feature in feature vector, value is the neuron ID of the feature neuron
         self.resolution_order = []
         self.edges_path = pl.Path(config["edges_path"])
         self.nodes_path = pl.Path(config["nodes_path"])
@@ -114,18 +122,20 @@ class GraphData():
             lines = lines[2:]  # skip the first two lines
             for line in lines:
                 fields = line.strip().split()  # split on tab separator
-                paper_idx, _topic, *features, summary = fields  # extract paper name and topic/label
-                paper_idx = int(paper_idx.strip().removeprefix("paper:"))  # make paper ID an int
-                self.features[paper_idx] = [int(name in summary) for name in all_features]  # convert to binary features
+                paper_id, _topic, *features, summary = fields  # extract paper name and topic/label
+                paper_id = int(paper_id.strip().removeprefix("paper:"))  # make paper ID an int
+                self.features[paper_id] = [int(name in summary) for name in all_features]  # convert to binary features
 
-        self.paper_to_features = {}  # keyed on paper ID, value is the number of features it has
-        self.feature_to_papers = {}  # keyed on feature ID, value is the number of papers that have that feature
+        self.num_features = len(self.features[paper_id])
+
+        self.paper_featurecount = {}  # keyed on paper ID, value is the number of features it has
+        self.feature_papercount = {}  # keyed on feature ID, value is the number of papers that have that feature
         for p in self.features.keys():
-            self.paper_to_features[p] = np.sum(self.features[p])
+            self.paper_featurecount[p] = np.sum(self.features[p])
             for i in range(len(self.features[p])):
-                if (i not in self.feature_to_papers.keys()):
-                    self.feature_to_papers[i] = 0
-                self.feature_to_papers[i] += self.features[p][i]
+                if (i not in self.feature_papercount.keys()):
+                    self.feature_papercount[i] = 0
+                self.feature_papercount[i] += self.features[p][i]
 
     def load_graph(self):
         if self.edges_path.suffix == ".cites":
@@ -216,21 +226,21 @@ class GraphData():
         validation_papers = set(self.validation_papers)
         test_papers = set(self.test_papers)
 
-        c = self.config
+        cfg = self.config
 
         for node in self.graph.nodes:
             if (node not in self.paper_to_topic.keys()):
                 continue
             if node in train_papers:
-                neuron = model.create_neuron(threshold=c["paper_threshold"], leak=c["paper_leak"], refractory_period=c["train_ref"])
+                neuron = model.create_neuron(threshold=cfg["paper_threshold"], leak=cfg["paper_leak"], refractory_period=cfg["train_ref"])
             elif node in validation_papers:
-                neuron = model.create_neuron(threshold=c["paper_threshold"], leak=c["paper_leak"], refractory_period=c["validation_ref"])
+                neuron = model.create_neuron(threshold=cfg["paper_threshold"], leak=cfg["paper_leak"], refractory_period=cfg["validation_ref"])
             elif node in test_papers:
-                neuron = model.create_neuron(threshold=c["paper_threshold"], leak=c["paper_leak"], refractory_period=c["test_ref"])
+                neuron = model.create_neuron(threshold=cfg["paper_threshold"], leak=cfg["paper_leak"], refractory_period=cfg["test_ref"])
             paper_neurons[node] = neuron.idx
 
         for t in self.topics:
-            neuron = model.create_neuron(threshold=c["topic_threshold"], leak=c["topic_leak"], refractory_period=0)
+            neuron = model.create_neuron(threshold=cfg["topic_threshold"], leak=cfg["topic_leak"], refractory_period=0)
             topic_neurons[t] = neuron.idx
 
         for edge in self.graph.edges:
@@ -241,28 +251,54 @@ class GraphData():
             post = paper_neurons[cited]
             if pre == post:
                 continue
-            model.create_synapse(pre, post, weight=c["graph_weight"], delay=c["graph_delay"], stdp_enabled=False)
-            model.create_synapse(post, pre, weight=c["graph_weight"], delay=c["graph_delay"], stdp_enabled=False)
+            model.create_synapse(pre, post, weight=cfg["graph_weight"], delay=cfg["graph_delay"], stdp_enabled=False)
+            model.create_synapse(post, pre, weight=cfg["graph_weight"], delay=cfg["graph_delay"], stdp_enabled=False)
 
         for paper in self.train_papers:
-            paper_neuron = paper_neurons[paper]
-            topic_neuron = topic_neurons[self.paper_to_topic[paper]]
-            model.create_synapse(paper_neuron, topic_neuron, weight=c["train_to_topic_weight"], delay=c["train_to_topic_delay"], stdp_enabled=False)
-            model.create_synapse(topic_neuron, paper_neuron, weight=c["train_to_topic_weight"], delay=c["train_to_topic_delay"], stdp_enabled=False)
+            p = paper_neurons[paper]
+            t = topic_neurons[self.paper_to_topic[paper]]
+            model.create_synapse(p, t, weight=cfg["train_to_topic_weight"], delay=cfg["train_to_topic_delay"], stdp_enabled=False)
+            model.create_synapse(t, p, weight=cfg["train_to_topic_weight"], delay=cfg["train_to_topic_delay"], stdp_enabled=False)
 
         for paper in self.validation_papers:
             for topic in self.topics:
-                paper_neuron = paper_neurons[paper]
-                topic_neuron = topic_neurons[topic]
-                model.create_synapse(paper_neuron, topic_neuron, stdp_enabled=True, weight=c["validation_to_topic_weight"], delay=c["validation_to_topic_delay"])
-                model.create_synapse(topic_neuron, paper_neuron, stdp_enabled=True, weight=c["validation_to_topic_weight"], delay=c["validation_to_topic_delay"])
+                p = paper_neurons[paper]
+                t = topic_neurons[topic]
+                model.create_synapse(p, t, stdp_enabled=True, weight=cfg["validation_to_topic_weight"], delay=cfg["validation_to_topic_delay"])
+                model.create_synapse(t, p, stdp_enabled=True, weight=cfg["validation_to_topic_weight"], delay=cfg["validation_to_topic_delay"])
 
         for paper in self.test_papers:
             for topic in self.topics:
-                paper_neuron = paper_neurons[paper]
-                topic_neuron = topic_neurons[topic]
-                model.create_synapse(paper_neuron, topic_neuron, stdp_enabled=True, weight=c["test_to_topic_weight"], delay=c["test_to_topic_delay"])
-                model.create_synapse(topic_neuron, paper_neuron, stdp_enabled=True, weight=c["test_to_topic_weight"], delay=c["test_to_topic_delay"])
+                p = paper_neurons[paper]
+                t = topic_neurons[topic]
+                model.create_synapse(p, t, stdp_enabled=True, weight=cfg["test_to_topic_weight"], delay=cfg["test_to_topic_delay"])
+                model.create_synapse(t, p, stdp_enabled=True, weight=cfg["test_to_topic_weight"], delay=cfg["test_to_topic_delay"])
+
+        if not cfg['features']:
+            return
+
+        # connect features to paper neurons if features are enabled
+        for feature_idx in range(self.num_features):
+            feature = model.create_neuron(threshold=cfg["feature_threshold"], leak=cfg["feature_leak"], refractory_period=cfg["feature_ref"])
+            self.feature_to_neuron_id[feature_idx] = feature.idx
+
+        for paper in self.graph.nodes:
+            if paper not in self.paper_to_topic.keys():
+                continue
+            p = paper_neurons[paper]
+            features = self.features[paper]
+            indices = np.nonzero(features)[0]
+            for feature_idx in indices:
+                f = self.feature_to_neuron_id[feature_idx]
+                model.create_synapse(p, f, weight=cfg["paper_to_feature_weight"], delay=cfg["paper_to_feature_delay"], stdp_enabled=cfg['paper_to_feature_stdp'])
+                model.create_synapse(f, p, weight=cfg["feature_to_paper_weight"], delay=cfg["paper_to_feature_delay"], stdp_enabled=cfg['paper_to_feature_stdp'])
+
+        if not cfg['feature_to_topic']:
+            return
+
+        for feature, topic in product(self.feature_to_neuron_id.values(), topic_neurons.values()):
+            model.create_synapse(feature, topic, weight=cfg["feature_to_topic_weight"], delay=cfg["feature_to_topic_delay"], stdp_enabled=cfg['feature_to_topic_stdp'])
+            model.create_synapse(topic, feature, weight=cfg["feature_to_topic_weight"], delay=cfg["feature_to_topic_delay"], stdp_enabled=cfg['feature_to_topic_stdp'])
 
 
 def test_paper_from_pickle(x):
@@ -336,8 +372,9 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     model_time = time.time()
+    config = default_config.copy()
     with open(args.config, 'r') as f:
-        config = yaml.load(f)
+        config.update(yaml.load(f))
 
     print(f"Loaded config from {args.config}")
     print(f"This is the {config['dataset']} dataset over the {config['mode']} split.")
