@@ -1,6 +1,9 @@
 features: false  # Choices: [0,1]
 paper_leak: 0.0  # Choices: [1., 10., 100., 100000.]
 paper_threshold: 1.0  # Choices: [0.25, 0.5, 0.75, 1.0, 1.5]
+train_topics_mult: 20
+validation_topics_mult: 20
+test_size: 1000
 train_ref: 1  # Choices: [1.0, 5.0, 10.0, 100.0, 1000.0]
 feature_ref: 1  # Choices: [1.0, 5.0, 10.0, 100.0, 1000.0]
 validation_ref: 1000  # Choices: [1.0, 5.0, 10.0, 100.0, 1000.0]
