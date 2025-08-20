@@ -21,7 +21,6 @@ from sklearn.preprocessing import MultiLabelBinarizer
 
 # typing:
 from superneuromat import Neuron, Synapse
-from numpy import _ArrayOrScalarCommon
 
 Pname = str | int
 
@@ -72,7 +71,8 @@ class bidict(dict):
 class Paper:
     idx: str  # Paper ID
     label: str = ''  # Paper category/topic
-    features: (tuple | list)[bool | int | float] = ()  # binary features
+    features: tuple[bool | int | float, ...] | list[bool | int | float]
+    features = ()  # binary features
     citations: list[str] = field(default_factory=list)  # IDs of papers cited by this paper
     neuron: snm.Neuron = None
 
@@ -131,7 +131,6 @@ class GraphData():
         backend = override or self.config.get("backend", "auto")
         if backend == "auto":
             backend = self.snn.recommend(self.config["simtime"])
-            self.snn.backend = backend
         if backend == "gpu":
             processes = int(self.config.get("gpu_processes", 1))
         elif self.config.get("processes", "auto") == "auto":
@@ -140,6 +139,7 @@ class GraphData():
                 raise RuntimeError("Unable to determine number of CPUs. Please specify the number of processes manually.")
         else:
             processes = self.config["processes"]
+        self.snn.backend = backend
         return processes
 
     @property
@@ -412,11 +412,10 @@ class GraphData():
             feature = model.create_neuron(threshold=cfg["feature_threshold"], leak=cfg["feature_leak"], refractory_period=cfg["feature_ref"])
             self.feature_neurons[feature_idx] = feature.idx
 
-        for neuron in self.paper_neurons:
-            paper = self.paper_neurons.inverse[neuron]
+        for paper_idx, neuron in self.paper_neurons.items():
             p = neuron
-            features = self.features[paper]
-            indices = np.nonzero(features)[0]
+            features = self.papers[paper_idx].features
+            indices = np.nonzero(features)[0]  # pyright: ignore[reportArgumentType]
             for feature_idx in indices:
                 f = self.feature_neurons[feature_idx]
                 model.create_synapse(p, f, weight=cfg["paper_to_feature_weight"], delay=cfg["paper_to_feature_delay"], stdp_enabled=cfg['paper_to_feature_stdp'])
@@ -457,12 +456,12 @@ def test_paper(x):
     for topic_id, topic_paper_id in topic_neurons.items():
         # Find the synapse from topic neuron to test paper neuron
         synapse = snn.get_synapse(paper_neuron, topic_paper_id)
-        topic_weights.append((synapse.weight, topic_id))
+        topic_weights.append((topic_id, synapse.weight))
 
     # sort by highest to lowest weight
     # ties are resolved by the order of topic_weights, which is ordered by topic_neurons
-    topic_weights = sorted(topic_weights, reverse=True)
-    best_weight, _best_topic = topic_weights[0]
+    topic_weights = sorted(topic_weights, key=lambda x: x[1], reverse=True)
+    _best_topic, best_weight = topic_weights[0]
     ties = [topic for topic, weight in topic_weights if weight == best_weight]
     # if len(ties) > 1:  # check for ties
     #     best_topic = None  # don't count ties as correct
@@ -473,15 +472,15 @@ def test_paper(x):
         for topic in ties:
             # score each topic by summing the weights of
             # paper -> feature[i] -> topic synapses over i, if feature[i] is active
-            feature_neurons = [graph.feature_neurons[i] for i in np.nonzero(paper.features)[0]]
+            feature_neurons = [graph.feature_neurons[i] for i in np.nonzero(paper.features)[0]]  # pyright: ignore[reportArgumentType]
             score = 0
             for feature_neuron in feature_neurons:
                 paper_to_feature = snn.get_synapse(paper_neuron, feature_neuron)
                 feature_to_topic = snn.get_synapse(feature_neuron, topic_neurons[topic])
                 score += paper_to_feature.weight * feature_to_topic.weight
-            topic_scores.append((score, topic))
+            topic_scores.append((topic, score))
         # choose papers with the highest score
-        max_score, _best_topic = max(topic_scores)
+        _best_topic, max_score = max(topic_scores, key=lambda x: x[1])
         ties = [topic for topic, score in topic_scores if score == max_score]
 
     actual_topic = paper.label
