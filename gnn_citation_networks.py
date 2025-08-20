@@ -19,6 +19,12 @@ import superneuromat as snm
 from tqdm.contrib.concurrent import process_map
 from sklearn.preprocessing import MultiLabelBinarizer
 
+# typing:
+from superneuromat import Neuron, Synapse
+from numpy import _ArrayOrScalarCommon
+
+Pname = str | int
+
 wd = pl.Path(__file__).parent.absolute()  # get the Path() of this python file
 
 defaultconfig_path = wd / 'configs/default_config.yaml'
@@ -66,7 +72,7 @@ class bidict(dict):
 class Paper:
     idx: str  # Paper ID
     label: str = ''  # Paper category/topic
-    features: tuple[bool | int | float, ...] = ()  # binary features
+    features: (tuple | list)[bool | int | float] = ()  # binary features
     citations: list[str] = field(default_factory=list)  # IDs of papers cited by this paper
     neuron: snm.Neuron = None
 
@@ -82,19 +88,17 @@ class GraphData():
         self.name = name
         config.update(kwargs)
         self.config = config
-        self.papers = {}
-        self.paper_neurons = bidict()
-        self.topic_neurons = bidict()
-        self.topics = []            # the list of topics
-        self.paper_featurecount = {}  # keyed on paper ID, value is the number of features it has
-        self.feature_papercount = {}  # keyed on idx of feature in feature vector, value is the number of papers that have that feature
+        self.papers: dict[Pname, Paper] = {}
+        self.paper_neurons: bidict[Pname, Neuron] = bidict()
+        self.topic_neurons: bidict[str, Neuron] = bidict()
+        self.topics: list[str] = []  # the list of topics
         self.feature_neurons = {}  # keyed on idx of feature in feature vector, value is the neuron ID of the feature neuron
-        self.resolution_order = []
+        self.resolution_order: list[Pname] = []
         self.edges_path = pl.Path(self.config["edges_path"])
         self.nodes_path = pl.Path(self.config["nodes_path"])
-        self.train_papers = []
-        self.validation_papers = []
-        self.test_papers = []
+        self.train_papers: list[Pname] = []
+        self.validation_papers: list[Pname] = []
+        self.test_papers: list[Pname] = []
         self.mlb = MultiLabelBinarizer()
 
         self.seed = config.get("seed", None)
@@ -377,28 +381,28 @@ class GraphData():
             post = self.paper_neurons[cited]
             if pre == post:
                 continue
-            model.create_synapse(pre, post, weight=cfg["graph_weight"], delay=cfg["graph_delay"], stdp_enabled=False)
-            model.create_synapse(post, pre, weight=cfg["graph_weight"], delay=cfg["graph_delay"], stdp_enabled=False)
+            model.create_synapse(pre, post, weight=cfg["graph_weight"], delay=cfg["graph_delay"])
+            model.create_synapse(post, pre, weight=cfg["graph_weight"], delay=cfg["graph_delay"])
 
         for paper in self.train_papers:
             p = self.paper_neurons[paper]
             t = self.topic_neurons[self.papers[paper].label]
-            model.create_synapse(p, t, weight=cfg["train_to_topic_weight"], delay=cfg["train_to_topic_delay"], stdp_enabled=False)
-            model.create_synapse(t, p, weight=cfg["train_to_topic_weight"], delay=cfg["train_to_topic_delay"], stdp_enabled=False)
+            model.create_synapse(p, t, weight=cfg["train_to_topic_weight"], delay=cfg["train_to_topic_delay"])
+            model.create_synapse(t, p, weight=cfg["train_to_topic_weight"], delay=cfg["train_to_topic_delay"])
 
         for paper in self.validation_papers:
             for topic in self.topics:
                 p = self.paper_neurons[paper]
                 t = self.topic_neurons[topic]
-                model.create_synapse(p, t, stdp_enabled=True, weight=cfg["validation_to_topic_weight"], delay=cfg["validation_to_topic_delay"])
-                model.create_synapse(t, p, stdp_enabled=True, weight=cfg["validation_to_topic_weight"], delay=cfg["validation_to_topic_delay"])
+                model.create_synapse(p, t, weight=cfg["validation_to_topic_weight"], delay=cfg["validation_to_topic_delay"], stdp_enabled=True)
+                model.create_synapse(t, p, weight=cfg["validation_to_topic_weight"], delay=cfg["validation_to_topic_delay"], stdp_enabled=True)
 
         for paper in self.test_papers:
             for topic in self.topics:
                 p = self.paper_neurons[paper]
                 t = self.topic_neurons[topic]
-                model.create_synapse(p, t, stdp_enabled=True, weight=cfg["test_to_topic_weight"], delay=cfg["test_to_topic_delay"])
-                model.create_synapse(t, p, stdp_enabled=True, weight=cfg["test_to_topic_weight"], delay=cfg["test_to_topic_delay"])
+                model.create_synapse(p, t, weight=cfg["test_to_topic_weight"], delay=cfg["test_to_topic_delay"], stdp_enabled=True)
+                model.create_synapse(t, p, weight=cfg["test_to_topic_weight"], delay=cfg["test_to_topic_delay"], stdp_enabled=True)
 
         if not cfg['features']:
             return
@@ -435,33 +439,52 @@ def test_paper_from_pickle(x):
 
 def test_paper(x):
     paper_id, graph = x
+    graph: GraphData
     snn = graph.snn
-    paper_neurons = graph.paper_neurons
     topic_neurons = graph.topic_neurons
+    paper = graph.papers[paper_id]
+    paper_neuron = graph.paper_neurons[paper_id]
 
     if (r := graph.resolution_order):
         # reorder topic_neurons by resolution order
         topic_neurons = {k: topic_neurons[k] for k in r}
 
-    snn.add_spike(0, paper_neurons[paper_id], 100.0)
-    # model.setup()
+    snn.add_spike(0, paper_neuron, 100.0)
     snn.simulate(time_steps=graph.config["simtime"])
 
     # Analyze the weights between the test paper neuron and topic neurons
     topic_weights = []
     for topic_id, topic_paper_id in topic_neurons.items():
         # Find the synapse from topic neuron to test paper neuron
-        synapse = snn.get_synapse(paper_neurons[paper_id], topic_paper_id)
-        topic_weights.append((topic_id, synapse.weight))
+        synapse = snn.get_synapse(paper_neuron, topic_paper_id)
+        topic_weights.append((synapse.weight, topic_id))
 
     # sort by highest to lowest weight
     # ties are resolved by the order of topic_weights, which is ordered by topic_neurons
-    topic_weights = sorted(topic_weights, key=lambda x: x[1], reverse=True)
-    best_topic, best_weight = topic_weights[0]
+    topic_weights = sorted(topic_weights, reverse=True)
+    best_weight, _best_topic = topic_weights[0]
     ties = [topic for topic, weight in topic_weights if weight == best_weight]
     # if len(ties) > 1:  # check for ties
     #     best_topic = None  # don't count ties as correct
-    actual_topic = graph.papers[paper_id].label
+
+    # if there are still ties, narrow down further by looking at paper->feature->topic weights
+    if graph.config['features'] and len(ties) > 1:
+        topic_scores = []
+        for topic in ties:
+            # score each topic by summing the weights of
+            # paper -> feature[i] -> topic synapses over i, if feature[i] is active
+            feature_neurons = [graph.feature_neurons[i] for i in np.nonzero(paper.features)[0]]
+            score = 0
+            for feature_neuron in feature_neurons:
+                paper_to_feature = snn.get_synapse(paper_neuron, feature_neuron)
+                feature_to_topic = snn.get_synapse(feature_neuron, topic_neurons[topic])
+                score += paper_to_feature.weight * feature_to_topic.weight
+            topic_scores.append((score, topic))
+        # choose papers with the highest score
+        max_score, _best_topic = max(topic_scores)
+        ties = [topic for topic, score in topic_scores if score == max_score]
+
+    actual_topic = paper.label
     total_spikes = snn.ispikes.sum()
     snn.release_mem()
     del snn, graph
