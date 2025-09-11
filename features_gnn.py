@@ -272,12 +272,12 @@ def load_network(graph, config):
             neuron = model.create_neuron(threshold=config["paper_threshold"], leak=config["paper_leak"], refractory_period=config["validation_ref"])
         elif node in graph.test_papers:
             neuron = model.create_neuron(threshold=config["paper_threshold"], leak=config["paper_leak"], refractory_period=config["test_ref"])
-        paper_neurons[node] = neuron
+        paper_neurons[node] = neuron.idx
 
 
     for t in graph.topics:
         neuron = model.create_neuron(threshold=config["topic_threshold"], leak=config["topic_leak"], refractory_period=0)
-        topic_neurons[t] = neuron
+        topic_neurons[t] = neuron.idx
 
     # Create feature neurons if features are enabled
     if config["features"] == 1:
@@ -289,7 +289,7 @@ def load_network(graph, config):
                 reset_state=0.0,
                 refractory_period=config["feature_ref"],
             )
-            feature_neurons[i] = neuron_id
+            feature_neurons[i] = neuron_id.idx
         #print("Feature neurons: ", len(feature_neurons))
 
     for edge in graph.graph.edges:
@@ -393,9 +393,7 @@ def test_paper(x):
     paper_id = paper_neurons[paper]
     model.add_spike(0, paper_id, 100.0)
     timesteps = config["simtime"]
-    model.stdp_setup(time_steps=config["stdp_timesteps"],
-        Apos=config["apos"], Aneg=config["aneg"] * config["stdp_timesteps"], negative_update=True, positive_update=True)
-    model.setup()
+    model.stdp_setup(Apos=config["apos"], Aneg=config["aneg"] * config["stdp_timesteps"], negative_update=True, positive_update=True)
 #     with open("pre_sim_model.pkl", "wb") as f:
 #         pickle.dump(model, f)
     model.simulate(time_steps=timesteps)
@@ -408,13 +406,15 @@ def test_paper(x):
 
     # Analyze the weights between the test paper neuron and topic neurons
     min_topic = None
+    synapse_indices = None
     for topic_id, topic_paper_id in topic_neurons.items():
         # Find the synapse from topic neuron to test paper neuron
         for i, (pre, post) in enumerate(zip(model.pre_synaptic_neuron_ids, model.post_synaptic_neuron_ids)):
             if pre == paper_id and post == topic_paper_id:
-                synapse_indices = i
+#                 print(f"pre {pre} and post {post}")
+                synapse_indices = model.get_synapse(pre, post)
         if synapse_indices:
-            idx = synapse_indices
+            idx = synapse_indices.idx
             weight = model.synaptic_weights[idx]
 #             print(f"Topic: {topic_id}, Paper: {paper}, Weight: {weight}")
             if weight > min_weight:
@@ -428,7 +428,8 @@ def test_paper(x):
 #         print(f"MIN VAL for {paper} Topic {min_topic} CORRECT")
 #     else:
 #         print(f"MIN VAL for {paper} Topic {min_topic} WRONG, Expected {actual_topic}")
-
+#     with open('cora_snn.json', 'w') as f:
+#         model.saveas_json(f, net_name="Cora_SNN")
     return retval, num_spikes
 
 
@@ -455,7 +456,8 @@ if __name__ == '__main__':
         for paper in graph.validation_papers:
             papers.append([paper, graph, config])
         x = pool.map(test_paper, papers)
-
+#         x, y = test_paper([papers[0][0], graph, config])
+#         exit()
         valid_acc = sum(i[0] for i in x) / len(graph.validation_papers)
         num_spikes = sum(i[1] for i in x)
         print("Number of spikes:", num_spikes)
