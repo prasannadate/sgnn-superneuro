@@ -277,12 +277,12 @@ def load_network(graph, config):
             neuron = model.create_neuron(threshold=config["paper_threshold"], leak=config["paper_leak"], refractory_period=config["validation_ref"])
         elif node in graph.test_papers:
             neuron = model.create_neuron(threshold=config["paper_threshold"], leak=config["paper_leak"], refractory_period=config["test_ref"])
-        paper_neurons[node] = neuron
+        paper_neurons[node] = neuron.idx
 
 
     for t in graph.topics:
         neuron = model.create_neuron(threshold=config["topic_threshold"], leak=config["topic_leak"], refractory_period=0)
-        topic_neurons[t] = neuron
+        topic_neurons[t] = neuron.idx
 
     # Create feature neurons if features are enabled
     if config["features"] == 1:
@@ -294,7 +294,7 @@ def load_network(graph, config):
                 reset_state=0.0,
                 refractory_period=config["feature_ref"],
             )
-            feature_neurons[i] = neuron_id
+            feature_neurons[i] = neuron_id.idx
         #print("Feature neurons: ", len(feature_neurons))
 
     for edge in graph.graph.edges:
@@ -475,9 +475,7 @@ def test_paper(x):
     paper_id = paper_neurons[paper]
     model.add_spike(0, paper_id, 100.0)
     timesteps = config["simtime"]
-    model.stdp_setup(time_steps=config["stdp_timesteps"],
-        Apos=config["apos"], Aneg=config["aneg"] * config["stdp_timesteps"], negative_update=True, positive_update=True)
-    model.setup()
+    model.stdp_setup(Apos=config["apos"], Aneg=config["aneg"] * config["stdp_timesteps"], negative_update=True, positive_update=True)
 #     with open("pre_sim_model.pkl", "wb") as f:
 #         pickle.dump(model, f)
     model.simulate(time_steps=timesteps)
@@ -517,7 +515,7 @@ def test_paper(x):
         chosen = tied_topics[0]
 
     retval = 1 if graph.paper_to_topic[paper] == chosen else 0
-    
+
 
     return retval, num_spikes
 
@@ -527,7 +525,7 @@ if __name__ == '__main__':
 #    pr.enable()
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config', default='configs/cora/apos_cora_config.yaml')
+    parser.add_argument('--config', default='configs/cora/apos_cora_features_config.yaml')
     args = parser.parse_args()
 
     with open(args.config, 'r') as f:
@@ -541,7 +539,7 @@ if __name__ == '__main__':
     total = 0
     num_spikes = 0
 
-    pool = Pool(8)
+    pool = Pool(30)
     if config["mode"] == "validation":
         papers = []
         for paper in graph.validation_papers:

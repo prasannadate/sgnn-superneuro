@@ -1,5 +1,5 @@
 dataset: cora  # Choices: ["cora", "citeseer", "pubmed", "microseer"]
-mode: test  # Choices: ["validation", "test"]
+mode: validation  # Choices: ["validation", "test"]
 seed: 0
 features: 1  # Choices: [0,1]
 paper_leak: 0.0  # Choices: [1., 10., 100., 100000.]
@@ -33,7 +33,7 @@ monitors: False
 paper_to_feature_stdp: True
 paper_to_feature_weighted: True
 apos: [1.0, .5, .1, .01, .001]
-aneg: [.0001]
+aneg: [-0.0001]
 stdp_timesteps: 5
 dump_json: 1
 
