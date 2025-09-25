@@ -539,7 +539,7 @@ if __name__ == '__main__':
     total = 0
     num_spikes = 0
 
-    pool = Pool(30)
+    pool = Pool(config["processes"])
     if config["mode"] == "validation":
         papers = []
         for paper in graph.validation_papers:
