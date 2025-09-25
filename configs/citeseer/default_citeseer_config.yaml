@@ -27,13 +27,13 @@ simtime: 10  # Choices: [5., 10., 20., 30., 40., 50., 75., 100., 150., 200.]
 processes: 8  # Adjust based on machine capabilities
 feature_to_topic:        1           # enable this block
 feature_to_topic_weight: 1        # base weight
-feature_to_topic_delay:  1 
-feature_to_topic_stdp:   1 
+feature_to_topic_delay:  1
+feature_to_topic_stdp:   1
 monitors: False
 paper_to_feature_stdp: True
 paper_to_feature_weighted: True
 apos: [1.0, .5, .1, .01, .001]
-aneg: [.0001]
+aneg: [-0.0001]
 stdp_timesteps: 5
 dump_json: 1
 

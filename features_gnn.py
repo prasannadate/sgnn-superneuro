@@ -394,11 +394,11 @@ def test_paper(x):
     model.add_spike(0, paper_id, 100.0)
     timesteps = config["simtime"]
     model.stdp_setup(Apos=config["apos"], Aneg=config["aneg"] * config["stdp_timesteps"], negative_update=True, positive_update=True)
-#     with open("pre_sim_model.pkl", "wb") as f:
-#         pickle.dump(model, f)
+    with open("citeseer_pre_sim_model_" + config["mode"] + ".pkl", "wb") as f:
+        pickle.dump(model, f)
     model.simulate(time_steps=timesteps)
-#     with open("post_sim_model.pkl", "wb") as f:
-#         pickle.dump(model, f)u
+    with open("citeseer_post_sim_model_" + config["mode"] + ".pkl", "wb") as f:
+        pickle.dump(model, f)
 
     num_spikes = np.sum(np.array(model.spike_train))
 #     print(num_spikes)
@@ -455,9 +455,9 @@ if __name__ == '__main__':
         papers = []
         for paper in graph.validation_papers:
             papers.append([paper, graph, config])
-        x = pool.map(test_paper, papers)
-#         x, y = test_paper([papers[0][0], graph, config])
-#         exit()
+#         x = pool.map(test_paper, papers)
+        x, y = test_paper([papers[0][0], graph, config])
+        exit()
         valid_acc = sum(i[0] for i in x) / len(graph.validation_papers)
         num_spikes = sum(i[1] for i in x)
         print("Number of spikes:", num_spikes)
