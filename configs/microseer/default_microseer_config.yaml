@@ -3,6 +3,8 @@ mode: test  # Choices: ["validation", "test"]
 nodes_path: !relpath ../../data/microseer/microseer.content
 edges_path: !relpath ../../data/microseer/microseer.cites
 seed: 120
+train_topics_mult: 3  # multiply by num_topics to get number of papers
+validation_topics_mult: 3  # multiply by num_topics to get number of papers
 features: 0  # Choices: [0,1]
 paper_leak: 0.0  # Choices: [1., 10., 100., 100000.]
 paper_threshold: 1.0  # Choices: [0.25, 0.5, 0.75, 1.0, 1.5]
@@ -30,7 +32,7 @@ monitors: False
 paper_to_feature_stdp: False
 paper_to_feature_weighted: False
 apos: [1.0, .5, .1, .01, .001]
-aneg: [-0.0001]
+aneg: !np "[-0.0001] * 5"
 stdp_timesteps: 5
 dump_json: 1
 backend: auto

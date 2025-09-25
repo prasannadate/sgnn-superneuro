@@ -3,7 +3,6 @@ mode: validation  # Choices: ["validation", "test"]
 nodes_path: !relpath ../../data/Cora/cora/cora.content
 edges_path: !relpath ../../data/Cora/cora/cora.cites
 seed: 0
-features: 0  # Choices: [0,1]
 paper_leak: 0.0  # Choices: [1., 10., 100., 100000.]
 paper_threshold: 1.0  # Choices: [0.25, 0.5, 0.75, 1.0, 1.5]
 paper_tau_minus: 30.0  # Choices: [5., 10., 15., 20., 25., 30., 40., 50.]
@@ -31,7 +30,7 @@ test_to_topic_alpha: 1.0  # Choices: [0.5, 1.0, 2.0, 5.0]
 test_to_topic_tau_plus: 30.0  # Choices: [5., 10., 15., 20., 25., 30., 40., 50.]
 paper_to_feature_weight: 0.2  # Choices: [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
 feature_to_paper_weight: 0.2  # Choices: [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
-paper_to_feature_delay: 4.0  # Choices: [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0]
+paper_to_feature_delay: 1.0  # Choices: [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0]
 paper_to_feature_alpha: 1.0  # Choices: [0.5, 1.0, 2.0, 5.0]
 paper_to_feature_tau_plus: 30.0  # Choices: [5., 10., 15., 20., 25., 30., 40., 50.]
 apos: !np [1.0, .5, .1, .01, .001]
