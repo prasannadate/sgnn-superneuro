@@ -605,6 +605,8 @@ def main(args):
     processes = graph.mp_processes(args.backend)
     papers = graph.selected_papers
     mode = config['mode']
+    if config['test_only_first']:
+        papers = papers[:config['test_only_first']]
 
     # if there's a tie among topics, choose the topic closest to [0]
     # resolution_order = sorted(topic_counts, key=topic_counts.get, reverse=True)  # sort topics by prevalence
@@ -657,7 +659,7 @@ if __name__ == '__main__':
     # parser.add_argument('--config', default=wd / 'configs/miniseer/default_miniseer_config.yaml')
     # parser.add_argument('--config', default=wd / 'configs/microseer/default_microseer_config.yaml')
     # parser.add_argument('--config', default=wd / 'configs/citeseer/default_citeseer_config.yaml')
-    parser.add_argument('--config', default=wd / 'configs/cora/default_cora_config.yaml')
-    # parser.add_argument('--config', default=wd / 'configs/pubmed/default_pubmed_config.yaml')
+    # parser.add_argument('--config', default=wd / 'configs/cora/default_cora_config.yaml')
+    parser.add_argument('--config', default=wd / 'configs/pubmed/default_pubmed_config.yaml')
     args = parser.parse_args()
     main(args)
