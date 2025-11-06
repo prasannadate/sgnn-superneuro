@@ -106,13 +106,15 @@ class GraphData():
 
         self.snn = snm.SNN()
 
+    def load_all(self, remove_missing=True):
         self.load_graph()
         self.load_papers()
         self.load_topics()
         # some papers appear as a citation but don't have a label. Remove those papers.
-        missing = [paper.idx for paper in self.papers.values() if not paper.label]
-        for paper in missing:
-            del self.papers[paper]
+        if remove_missing:
+            missing = [paper.idx for paper in self.papers.values() if not paper.label]
+            for paper in missing:
+                del self.papers[paper]
         if self.config['features']:
             self.load_features()
         if self.config['legacy_split']:
@@ -388,16 +390,16 @@ class GraphData():
         df = pd.DataFrame([all_papers, test, train, validation], index=['all', 'test', 'train', 'validation'])
         return df
 
-    def configure_model(self):
-        self.snn.apos = self.config["apos"]
-        self.snn.aneg = self.config["aneg"]
-
     def make_network(self):
         model = self.snn
         # create sets for faster __contains__ lookup
         train_papers = set(self.train_papers)
         validation_papers = set(self.validation_papers)
         test_papers = set(self.test_papers)
+
+        # set the apos and aneg values for STDP
+        self.snn.apos = self.config["apos"]
+        self.snn.aneg = self.config["aneg"]
 
         cfg = self.config
         # Create a neuron for each paper
@@ -564,7 +566,6 @@ def make_graph(args, base_config=default_config):
     # create a random generator seeded with the config seed
     graph = GraphData(name=config["dataset"], config=config)
     graph.make_network()
-    graph.configure_model()
 
     return graph
 
