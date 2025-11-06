@@ -90,10 +90,7 @@ class GraphData():
         config.update(kwargs)
         self.config = config
         self.papers: dict[Pname, Paper] = {}
-        self.paper_neurons: bidict[Pname, Neuron] = bidict()
-        self.topic_neurons: bidict[str, Neuron] = bidict()
         self.topics: list[str] = []  # the list of topics
-        self.feature_neurons = {}  # keyed on idx of feature in feature vector, value is the neuron ID of the feature neuron
         self.resolution_order: list[Pname] = []
         self.edges_path = pl.Path(self.config["edges_path"])
         self.nodes_path = pl.Path(self.config["nodes_path"])
@@ -103,8 +100,6 @@ class GraphData():
         self.mlb = MultiLabelBinarizer()
 
         self.seed = config.get("seed", None)
-
-        self.snn = snm.SNN()
 
     def load_all(self, remove_missing=True):
         self.load_graph()
@@ -132,21 +127,6 @@ class GraphData():
             self.selected_papers = self.train_papers
         else:
             self.selected_papers = []
-
-    def mp_processes(self, override=None):
-        backend = override or self.config.get("backend", "auto")
-        if backend == "auto":
-            backend = self.snn.recommend(self.config["simtime"])
-        if backend == "gpu":
-            processes = int(self.config.get("gpu_processes", 1))
-        elif self.config.get("processes", "auto") == "auto":
-            processes = os.cpu_count()
-            if processes is None:
-                raise RuntimeError("Unable to determine number of CPUs. Please specify the number of processes manually.")
-        else:
-            processes = self.config["processes"]
-        self.snn.backend = backend
-        return processes
 
     @property
     def seed(self):
@@ -390,6 +370,30 @@ class GraphData():
         df = pd.DataFrame([all_papers, test, train, validation], index=['all', 'test', 'train', 'validation'])
         return df
 
+
+class SGNN(GraphData):
+    def __init__(self, name, config, **kwargs):
+        super().__init__(name, config, **kwargs)
+        self.paper_neurons: bidict[Pname, Neuron] = bidict()
+        self.topic_neurons: bidict[str, Neuron] = bidict()
+        self.feature_neurons = {}  # keyed on idx of feature in feature vector, value is the neuron ID of the feature neuron
+        self.snn = snm.SNN()
+
+    def mp_processes(self, override=None):
+        backend = override or self.config.get("backend", "auto")
+        if backend == "auto":
+            backend = self.snn.recommend(self.config["simtime"])
+        if backend == "gpu":
+            processes = int(self.config.get("gpu_processes", 1))
+        elif self.config.get("processes", "auto") == "auto":
+            processes = os.cpu_count()
+            if processes is None:
+                raise RuntimeError("Unable to determine number of CPUs. Please specify the number of processes manually.")
+        else:
+            processes = self.config["processes"]
+        self.snn.backend = backend
+        return processes
+
     def make_network(self):
         model = self.snn
         # create sets for faster __contains__ lookup
@@ -484,7 +488,7 @@ def test_paper_from_pickle(x):
 
 def test_paper(x):
     paper_id, graph = x
-    graph: GraphData
+    graph: SGNN
     snn = graph.snn
     topic_neurons = graph.topic_neurons
     paper = graph.papers[paper_id]
@@ -564,7 +568,8 @@ def make_graph(args, base_config=default_config):
     print(f"This is the {config['dataset']} dataset over the {config['mode']} split.")
 
     # create a random generator seeded with the config seed
-    graph = GraphData(name=config["dataset"], config=config)
+    graph = SGNN(name=config["dataset"], config=config)
+    graph.load_all()
     graph.make_network()
 
     return graph
