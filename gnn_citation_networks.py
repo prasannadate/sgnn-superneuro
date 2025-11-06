@@ -7,9 +7,10 @@ import warnings
 import xyaml as yaml
 import pickle as pkl
 import pathlib as pl
+from itertools import product
+from collections import Counter
 from multiprocessing import Pool
 from dataclasses import dataclass, field
-from itertools import product
 
 import tqdm
 import numpy as np
@@ -114,7 +115,10 @@ class GraphData():
             del self.papers[paper]
         if self.config['features']:
             self.load_features()
-        self.train_val_test_split()
+        if self.config['legacy_split']:
+            self.train_val_test_split_legacy()
+        else:
+            self.train_val_test_split()
         self.select_papers(self.config['mode'])
 
     def select_papers(self, mode):
@@ -242,6 +246,46 @@ class GraphData():
     def load_papers(self):
         for paper in self.graph.nodes:
             self.papers[paper] = Paper(paper)
+
+    def train_val_test_split_legacy(self):
+        if (pick_evenly := self.config.get('pick_evenly', None)) is not None:
+            pick_evenly = set(pick_evenly) - {'null', None}
+            if pick_evenly != {'train', 'validation'}:
+                warnings.warn("WARNING: You're using config['legacy_split'] which only supports "
+                              "config['pick_evenly'] = ['train', 'validation']. "
+                              "We'll ignore your 'pick_evenly' setting.", RuntimeWarning, 2)
+
+        paperlist = list(self.papers.values())
+
+        def select_papers(topics_mult=20, used: set[int | str] | None = None):
+            used = used or set()  # papers that should not be selected
+            selected = []
+            topic_counts = Counter()
+            attempts = 0
+
+            while len(selected) < len(self.topics) * topics_mult:
+                idx = self.rng.integers(len(self.papers))
+                paper = paperlist[idx]
+                if (
+                    topic_counts[paper.label] < topics_mult
+                    and paper not in selected
+                    and paper.idx not in used
+                ):
+                    selected.append(paper.idx)
+                    topic_counts[paper.label] += 1
+                    attempts = 0
+                else:
+                    attempts += 1
+                    if attempts > 1000:
+                        raise RuntimeError("Failed to select a paper due to bad luck or lack of valid papers.")
+
+            return selected
+
+        self.train_papers = select_papers(topics_mult=self.config["train_topics_mult"])
+        self.validation_papers = select_papers(used=set(self.train_papers),  # disallow papers in the train set
+                                               topics_mult=self.config["validation_topics_mult"])
+        test_set = set(self.papers) - set(self.train_papers + self.validation_papers)  # remaining papers
+        self.test_papers = [papername for papername in self.papers if papername in test_set]  # preserve order
 
     def train_val_test_split(self):
         pool = list(self.papers)

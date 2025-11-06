@@ -1,5 +1,5 @@
-features: True  # Choices: [0,1]
-feature_to_topic: True  # only used if features is True
+features: false  # Choices: [0,1]
+feature_to_topic: false  # only used if features is True
 paper_leak: 0.0  # Choices: [1., 10., 100., 100000.]
 paper_threshold: 1.0  # Choices: [0.25, 0.5, 0.75, 1.0, 1.5]
 # these sizes are used to construct the network.
@@ -16,6 +16,7 @@ pick_evenly:
   - test
   - null  # this line lets you comment out any of the above three lines
 test_only_first: 1000  # only evaluate the first 1000 papers in the selected set. Set to `false` or `null` to evaluate all papers in the selected set.
+legacy_split: true  # if true, use the legacy split method
 train_ref: 1  # Choices: [1.0, 5.0, 10.0, 100.0, 1000.0]
 feature_ref: 1  # Choices: [1.0, 5.0, 10.0, 100.0, 1000.0]
 validation_ref: 1000  # Choices: [1.0, 5.0, 10.0, 100.0, 1000.0]

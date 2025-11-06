@@ -38,6 +38,6 @@ apos: [1.0, .5, .1, .01, .001]
 aneg: !np "[-0.0001] * 5"
 stdp_timesteps: 5
 dump_json: 1
-backend: gpu
+backend: cpu
 processes: auto  # Adjust based on machine capabilities
 gpu_processes: 2
