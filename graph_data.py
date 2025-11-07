@@ -183,8 +183,27 @@ class GraphData():
             self.graph = nx.read_edgelist(str(self.data_dir / 'Pubmed-Diabetes' / 'data' / 'edge_list.csv'),
                                           delimiter=",")
 
+    def _set_seed(self):
+        """ Sets the random seed for reproducibility.
+
+        Seeds in config files can be "seed" or "rng_seed", so we check for
+        the first one and if that doesn't exist then the second one.  Failing
+        that we just set it to what ever system entropy provides.
+
+        Used in train/val/test splits.
+
+        :return: None
+        """
+        if 'seed' in self.hyperparameters:
+            np.random.seed(self.hyperparameters["seed"])
+        elif 'rng_seed' in self.hyperparameters:
+            np.random.seed(self.hyperparameters["rng_seed"])
+        else:
+            np.random.seed()
+
     def train_val_test_split(self):
-        np.random.seed(self.hyperparameters["seed"])
+        self._set_seed()
+
         train_papers = []
         test_papers = []
         validation_papers = []
@@ -217,7 +236,8 @@ class GraphData():
 
 
     def train_val_test_split_small(self):
-        np.random.seed(self.hyperparameters["seed"])
+        self._set_seed()
+
         train_papers = []
         test_papers = []
         validation_papers = []
