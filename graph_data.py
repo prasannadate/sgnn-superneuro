@@ -8,32 +8,32 @@ import numpy as np
 
 
 class GraphData():
-    def __init__(self, name, hyperparameters, data_dir):
+    def __init__(self, name, seed, data_dir):
         """
 
         :param name: benchmark dataset name
-        :param hyperparameters: contains configuration parameters
+        :param seed: RNG seed
         :param data_dir: directory where the data is stored
         """
         self.name = name
-        self.hyperparameters = hyperparameters
+        self.seed = seed # RNG seed used in train_val_test_split*()
         self.data_dir = Path(data_dir)
         self.paper_to_topic = {} # maps the paper ID in the dataset to its topic ID
-        self.index_to_paper = []    # creates an index for each paper
-        self.topics = []            # the list of topics 
+        self.index_to_paper = [] # creates an index for each paper
+        self.topics = []         # the list of topics
         self.train_papers = []
         self.validation_papers = []
         self.test_papers = []
-        self.load_topics()
+        self._load_topics()
         if self.name != "microseer":
             # FIXME why?
             self.train_val_test_split()
         else:
             self.train_val_test_split_small()
-        self.load_features()
-        self.load_graph()
+        self._load_features()
+        self._load_graph()
 
-    def load_topics(self):
+    def _load_topics(self):
         if (self.name == "cora"):
             with (self.data_dir / "Cora" / "group-edges.csv").open('r') as f:
                 lines = f.readlines()
@@ -88,7 +88,7 @@ class GraphData():
                 self.paper_to_topic["paper:"+fields[0]] = fields[1]
                 self.index_to_paper.append("paper:"+fields[0])
 
-    def load_features(self):
+    def _load_features(self):
         self.features = {} # keyed on paper ID, value is the feature vector
         if (self.name == "cora"):
             with (self.data_dir / "Cora" / "cora" / "cora.content").open('r') as  f:
@@ -166,7 +166,7 @@ class GraphData():
                     self.feature_to_papers[i] = 0
                 self.feature_to_papers[i] += self.features[p][i]
  
-    def load_graph(self):
+    def _load_graph(self):
         if (self.name == "cora"):
             self.graph = nx.read_edgelist(str(self.data_dir / 'Cora' / 'edges.csv'),
                                           delimiter=",")
@@ -183,26 +183,10 @@ class GraphData():
             self.graph = nx.read_edgelist(str(self.data_dir / 'Pubmed-Diabetes' / 'data' / 'edge_list.csv'),
                                           delimiter=",")
 
-    def _set_seed(self):
-        """ Sets the random seed for reproducibility.
 
-        Seeds in config files can be "seed" or "rng_seed", so we check for
-        the first one and if that doesn't exist then the second one.  Failing
-        that we just set it to what ever system entropy provides.
-
-        Used in train/val/test splits.
-
-        :return: None
-        """
-        if 'seed' in self.hyperparameters:
-            np.random.seed(self.hyperparameters["seed"])
-        elif 'rng_seed' in self.hyperparameters:
-            np.random.seed(self.hyperparameters["rng_seed"])
-        else:
-            np.random.seed()
 
     def train_val_test_split(self):
-        self._set_seed()
+        np.random.seed(self.seed)
 
         train_papers = []
         test_papers = []
@@ -236,7 +220,7 @@ class GraphData():
 
 
     def train_val_test_split_small(self):
-        self._set_seed()
+        np.random.seed(self.seed)
 
         train_papers = []
         test_papers = []
