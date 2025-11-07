@@ -67,7 +67,7 @@ class GraphData():
                 self.paper_to_topic[fields[0]] = fields[-1]
                 self.index_to_paper.append(fields[0])
         elif (self.name == "miniseer"):
-            with (self.data_dir / "miniseer" / "miniseer.content").open('r') as
+            with (self.data_dir / "miniseer" / "miniseer.content").open('r') as f:
                 lines = f.readlines()
 
             for line in lines:
@@ -111,6 +111,28 @@ class GraphData():
                 self.features[paper_id] = feature
                 self.num_features = len(feature)
             print(f"NUM PAPERS WITH FEATURES: {len(self.features.keys())}")
+        elif (self.name == "microseer"):
+            with (self.data_dir / "microseer" / "microseer.content").open('r') as  f:
+                lines = f.readlines()
+
+            for line in lines:
+                fields = line.strip().split()
+                paper_id = fields[0]
+                feature = [int(x) for x in fields[1:-1]]
+                self.features[paper_id] = feature
+                self.num_features = len(feature)
+            print("NUM PAPERS WITH FEATURES: ", len(self.features.keys()))
+        elif (self.name == "miniseer"):
+            with (self.data_dir / "miniseer" / "miniseer.content").open('r') as  f:
+                lines = f.readlines()
+
+            for line in lines:
+                fields = line.strip().split()
+                paper_id = fields[0]
+                feature = [int(x) for x in fields[1:-1]]
+                self.features[paper_id] = feature
+                self.num_features = len(feature)
+            print("NUM PAPERS WITH FEATURES: ", len(self.features.keys()))
         elif (self.name == "pubmed"):
             with (self.data_dir / "Pubmed-Diabetes" / "data" / "Pubmed-Diabetes.NODE.paper.tab").open('r') as  f:
                 lines = f.readlines()
@@ -151,6 +173,12 @@ class GraphData():
         elif (self.name == "citeseer"):
             self.graph = nx.read_edgelist(str(self.data_dir / 'citeseer' / 'citeseer.cites'))
 
+        elif (self.name == "microseer"):
+            self.graph = nx.read_edgelist(str(self.data_dir / 'microseer' / 'microseer.cites'))
+
+        elif (self.name == "miniseer"):
+            self.graph = nx.read_edgelist(str(self.data_dir / 'miniseer' / 'miniseer.cites'))
+
         elif (self.name == "pubmed"):
             self.graph = nx.read_edgelist(str(self.data_dir / 'Pubmed-Diabetes' / 'data' / 'edge_list.csv'),
                                           delimiter=",")
@@ -185,4 +213,37 @@ class GraphData():
 
         self.train_papers = train_papers
         self.test_papers = test_papers
-        self.validation_papers = validation_papers 
+        self.validation_papers = validation_papers
+
+
+    def train_val_test_split_small(self):
+        np.random.seed(self.hyperparameters["seed"])
+        train_papers = []
+        test_papers = []
+        validation_papers = []
+        check_breakdown = {}
+
+        for k in self.topics:
+            check_breakdown[k] = 0
+
+        while (len(train_papers) < len(self.topics)*5):
+            index = np.random.randint(len(self.index_to_paper))
+            topic = self.paper_to_topic[self.index_to_paper[index]]
+            if (check_breakdown[topic] < 10 and self.index_to_paper[index] not in train_papers):
+                train_papers.append(self.index_to_paper[index])
+                check_breakdown[topic] += 1
+
+        while (len(validation_papers) < len(self.topics)*5):
+            index = np.random.randint(len(self.index_to_paper))
+            topic = self.paper_to_topic[self.index_to_paper[index]]
+            if (check_breakdown[topic] < 20 and self.index_to_paper[index] not in train_papers and self.index_to_paper[index] not in validation_papers):
+                validation_papers.append(self.index_to_paper[index])
+                check_breakdown[topic] += 1
+
+        for i in range(len(self.index_to_paper)):
+            if (self.index_to_paper[i] not in train_papers and self.index_to_paper[i] not in validation_papers and self.index_to_paper[i] in self.paper_to_topic.keys()):
+                test_papers.append(self.index_to_paper[i])
+
+        self.train_papers = train_papers
+        self.test_papers = test_papers
+        self.validation_papers = validation_papers
