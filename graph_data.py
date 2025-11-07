@@ -52,9 +52,31 @@ class GraphData():
                 fields = line.strip().split()
                 if (fields[-1] not in self.topics):
                     self.topics.append(fields[-1])
-                print(fields[0])
+                # print(fields[0])
                 self.paper_to_topic[fields[0]] = fields[-1]
-                self.index_to_paper.append(fields[0])   
+                self.index_to_paper.append(fields[0])
+        elif (self.name == "microseer"):
+            with (self.data_dir / "microseer" / "microseer.content").open('r') as f:
+                lines = f.readlines()
+
+            for line in lines:
+                fields = line.strip().split()
+                if (fields[-1] not in self.topics):
+                    self.topics.append(fields[-1])
+                #print(fields[0])
+                self.paper_to_topic[fields[0]] = fields[-1]
+                self.index_to_paper.append(fields[0])
+        elif (self.name == "miniseer"):
+            with (self.data_dir / "miniseer" / "miniseer.content").open('r') as
+                lines = f.readlines()
+
+            for line in lines:
+                fields = line.strip().split()
+                if (fields[-1] not in self.topics):
+                    self.topics.append(fields[-1])
+                #print(fields[0])
+                self.paper_to_topic[fields[0]] = fields[-1]
+                self.index_to_paper.append(fields[0])
         elif (self.name == "pubmed"):
             with (self.data_dir / "Pubmed-Diabetes" / "data" / "Pubmed-Diabetes.NODE.paper.tab").open('r') as f:
                 lines = f.readlines()
