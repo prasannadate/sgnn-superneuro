@@ -135,7 +135,9 @@ if __name__ == '__main__':
     config = yaml.safe_load(open("configs/cora/apos_cora_config.yaml"))
 
     np.random.seed(config["seed"])
-    graph = GraphData(config["dataset"], config)
+    graph = GraphData(config["dataset"],
+                      seed=config['seed'],
+                      data_dir='./data')
 
     i = 0
     correct = 0
