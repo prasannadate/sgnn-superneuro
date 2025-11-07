@@ -1,11 +1,23 @@
+#!/usr/bin/env python3
+"""
+Graph data loading and processing class
+"""
+from pathlib import Path
 import networkx as nx
 import numpy as np
 
 
 class GraphData():
-    def __init__(self, name, config):
+    def __init__(self, name, hyperparameters, data_dir):
+        """
+
+        :param name: benchmark dataset name
+        :param hyperparameters: contains configuration parameters
+        :param data_dir: directory where the data is stored
+        """
         self.name = name
-        self.config = config
+        self.hyperparameters = hyperparameters
+        self.data_dir = Path(data_dir)
         self.paper_to_topic = {} # maps the paper ID in the dataset to its topic ID
         self.index_to_paper = []    # creates an index for each paper
         self.topics = []            # the list of topics 
@@ -13,15 +25,18 @@ class GraphData():
         self.validation_papers = []
         self.test_papers = []
         self.load_topics()
-        self.train_val_test_split()
+        if self.name != "microseer":
+            # FIXME why?
+            self.train_val_test_split()
+        else:
+            self.train_val_test_split_small()
         self.load_features()
         self.load_graph()
 
     def load_topics(self):
         if (self.name == "cora"):
-            f = open("data/Cora/group-edges.csv", 'r')
-            lines = f.readlines()
-            f.close()
+            with (self.data_dir / "Cora" / "group-edges.csv").open('r') as f:
+                lines = f.readlines()
 
             for line in lines:
                 fields = line.strip().split(",")
@@ -30,9 +45,8 @@ class GraphData():
                 self.paper_to_topic[fields[0]] = fields[1]
                 self.index_to_paper.append(fields[0])
         elif (self.name == "citeseer"):
-            f = open("data/citeseer/citeseer.content", 'r')
-            lines = f.readlines()
-            f.close()
+            with (self.data_dir / "citeseer" / "citeseer.content").open('r') as f:
+                lines = f.readlines()
 
             for line in lines:
                 fields = line.strip().split()
@@ -42,12 +56,10 @@ class GraphData():
                 self.paper_to_topic[fields[0]] = fields[-1]
                 self.index_to_paper.append(fields[0])   
         elif (self.name == "pubmed"):
-            f = open("data/Pubmed-Diabetes/data/Pubmed-Diabetes.NODE.paper.tab", 'r')
-            lines = f.readlines()
-            f.close()
-            lines = lines[2:]
-        
-            for line in lines:
+            with (self.data_dir / "Pubmed-Diabetes" / "data" / "Pubmed-Diabetes.NODE.paper.tab").open('r') as f:
+                lines = f.readlines()
+
+            for line in lines[2:]: # skip header lines
                 fields = line.strip().split()
                 if (fields[1] not in self.topics):
                     self.topics.append(fields[1])
@@ -57,10 +69,9 @@ class GraphData():
     def load_features(self):
         self.features = {} # keyed on paper ID, value is the feature vector
         if (self.name == "cora"):
-            f = open("data/Cora/cora/cora.content", 'r')
-            lines = f.readlines()
-            f.close()
-            
+            with (self.data_dir / "Cora" / "cora" / "cora.content").open('r') as  f:
+                lines = f.readlines()
+
             for line in lines:
                 fields = line.strip().split()
                 paper_id = fields[0]
@@ -68,20 +79,20 @@ class GraphData():
                 self.features[paper_id] = feature
                 self.num_features = len(feature)
         elif (self.name == "citeseer"):
-            f = open("data/citeseer/citeseer.content", 'r')
-            lines = f.readlines()
-            f.close()
+            with (self.data_dir / "citeseer" / "citeseer.content").open('r') as  f:
+                lines = f.readlines()
+
             for line in lines:
                 fields = line.strip().split()
                 paper_id = fields[0]
                 feature = [int(x) for x in fields[1:-1]]
                 self.features[paper_id] = feature
                 self.num_features = len(feature)
-            print("NUM PAPERS WITH FEATURES: ", len(self.features.keys()))
+            print(f"NUM PAPERS WITH FEATURES: {len(self.features.keys())}")
         elif (self.name == "pubmed"):
-            f = open("data/Pubmed-Diabetes/data/Pubmed-Diabetes.NODE.paper.tab", 'r')
-            lines = f.readlines()
-            f.close()
+            with (self.data_dir / "Pubmed-Diabetes" / "data" / "Pubmed-Diabetes.NODE.paper.tab").open('r') as  f:
+                lines = f.readlines()
+
             feature_line = lines[1]
             fields = feature_line.split()
             fields = fields[1:-1]
@@ -113,16 +124,17 @@ class GraphData():
  
     def load_graph(self):
         if (self.name == "cora"):
-            self.graph = nx.read_edgelist("data/Cora/edges.csv", delimiter=",")
-
+            self.graph = nx.read_edgelist(str(self.data_dir / 'Cora' / 'edges.csv'),
+                                          delimiter=",")
         elif (self.name == "citeseer"):
-            self.graph = nx.read_edgelist("data/citeseer/citeseer.cites")
+            self.graph = nx.read_edgelist(str(self.data_dir / 'citeseer' / 'citeseer.cites'))
 
         elif (self.name == "pubmed"):
-            self.graph = nx.read_edgelist("data/Pubmed-Diabetes/data/edge_list.csv", delimiter=",")
+            self.graph = nx.read_edgelist(str(self.data_dir / 'Pubmed-Diabetes' / 'data' / 'edge_list.csv'),
+                                          delimiter=",")
 
     def train_val_test_split(self):
-        np.random.seed(self.config["seed"])
+        np.random.seed(self.hyperparameters["seed"])
         train_papers = []
         test_papers = []
         validation_papers = []
