@@ -1,3 +1,4 @@
+data_root: !relpath ../data  # path to the data directory
 features: false  # Choices: [0,1]
 feature_to_topic: false  # only used if features is True
 paper_leak: 0.0  # Choices: [1., 10., 100., 100000.]

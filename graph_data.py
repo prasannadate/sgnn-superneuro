@@ -1,7 +1,9 @@
+import os
 import warnings
 import pathlib as pl
 from collections import Counter
 from dataclasses import dataclass, field
+from os.path import expandvars
 
 import numpy as np
 import networkx as nx
@@ -35,14 +37,46 @@ class GraphData():
         self.papers: dict[Pname, Paper] = {}
         self.topics: list[str] = []  # the list of topics
         self.resolution_order: list[Pname] = []
-        self.edges_path = pl.Path(self.config["edges_path"])
-        self.nodes_path = pl.Path(self.config["nodes_path"])
+        self._edges_path = None
+        self._nodes_path = None
+        self.data_root: pl.Path | None = pl.Path(expandvars(p)) if (p := config.get("data_root", None)) else None
+        self.edges_path = expandvars(self.config["edges_path"])
+        self.nodes_path = expandvars(self.config["nodes_path"])
         self.train_papers: list[Pname] = []
         self.validation_papers: list[Pname] = []
         self.test_papers: list[Pname] = []
         self.mlb = MultiLabelBinarizer()
 
         self.seed = config.get("seed", None)
+
+    def resolve_path_with_root(self, path: os.PathLike, root: os.PathLike | None) -> pl.Path:
+        if not isinstance(path, pl.Path):
+            path = pl.Path(path)
+        if not isinstance(root, pl.Path) and root is not None:
+            root = pl.Path(root)
+        if path.expanduser().is_absolute() and root is not None:
+            warnings.warn(f"WARNING: Path {path} is absolute, but data_root is set to {root}. "
+                          "Ignoring data_root.", RuntimeWarning, stacklevel=3)
+            return path.expanduser().resolve()
+        return (root / path).expanduser().resolve()
+
+    @property
+    def edges_path(self):
+        assert self._edges_path is not None
+        return self.resolve_path_with_root(self._edges_path, self.data_root)
+
+    @edges_path.setter
+    def edges_path(self, path: os.PathLike):
+        self._edges_path = path
+
+    @property
+    def nodes_path(self):
+        assert self._nodes_path is not None
+        return self.resolve_path_with_root(self._nodes_path, self.data_root)
+
+    @nodes_path.setter
+    def nodes_path(self, path: os.PathLike):
+        self._nodes_path = path
 
     def load_all(self, remove_missing=True):
         self.load_graph()

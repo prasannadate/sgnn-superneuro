@@ -1,7 +1,7 @@
 dataset: microseer  # Choices: ["cora", "citeseer", "pubmed", "microseer"]
 mode: test  # Choices: ["validation", "test"]
-nodes_path: !relpath ../../data/microseer/microseer.content
-edges_path: !relpath ../../data/microseer/microseer.cites
+nodes_path: microseer/microseer.content
+edges_path: microseer/microseer.cites
 seed: 120
 train_topics_mult: 3  # multiply by num_topics to get number of papers
 validation_topics_mult: 3  # multiply by num_topics to get number of papers

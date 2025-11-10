@@ -1,7 +1,7 @@
 dataset: citeseer  # Choices: ["cora", "citeseer", "pubmed", microseer]
 mode: validation  # Choices: ["validation", "test"]
-nodes_path: !relpath ../../data/citeseer/citeseer.content
-edges_path: !relpath ../../data/citeseer/citeseer.cites
+nodes_path: citeseer/citeseer.content
+edges_path: citeseer/citeseer.cites
 seed: 0
 features: 0  # Choices: [0,1]
 paper_leak: 0.0  # Choices: [1., 10., 100., 100000.]
