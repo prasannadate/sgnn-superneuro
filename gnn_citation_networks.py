@@ -109,11 +109,16 @@ def test_paper(x):
     min_topic = None
     for topic_id, topic_paper_id in topic_neurons.items():
         # Find the synapse from topic neuron to test paper neuron
-        for i, (pre, post) in enumerate(zip(model.pre_synaptic_neuron_ids, model.post_synaptic_neuron_ids)):
+        synaptic_index = None # reset between topics
+        for i, (pre, post) in enumerate(zip(model.pre_synaptic_neuron_ids,
+                                            model.post_synaptic_neuron_ids)):
             if pre == paper_id and post == topic_paper_id:
-                synapse_indices = i
-        if synapse_indices:
-            idx = synapse_indices
+                synaptic_index = i
+                break # FIXME Mark: I added this because I assume you don't want
+                      # to keep searching after you found a match; but someone
+                      # should verify this is correct.
+        if synaptic_index:
+            idx = synaptic_index
             weight = model.synaptic_weights[idx]
 #             print(f"Topic: {topic_id}, Paper: {paper}, Weight: {weight}")
             if weight > min_weight:
