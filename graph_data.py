@@ -214,6 +214,7 @@ class GraphData():
                               "config['pick_evenly'] = ['train', 'validation']. "
                               "We'll ignore your 'pick_evenly' setting.", RuntimeWarning, 2)
 
+        rng = np.random.RandomState(self.seed)
         paperlist = list(self.papers.values())
 
         def select_papers(topics_mult=20, used: set[int | str] | None = None):
@@ -223,7 +224,7 @@ class GraphData():
             attempts = 0
 
             while len(selected) < len(self.topics) * topics_mult:
-                idx = self.rng.integers(len(self.papers))
+                idx = rng.randint(len(self.papers))
                 paper = paperlist[idx]
                 if (
                     topic_counts[paper.label] < topics_mult
