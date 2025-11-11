@@ -36,6 +36,7 @@ class GraphData():
         self.name = name
         config.update(kwargs)
         self.config = config
+        self.ordered_paper_ids: list[Pname] = []
         self.papers: dict[Pname, Paper] = {}
         self.topics: list[str] = []  # the list of topics
         self.resolution_order: Iterable[Pname] = []
@@ -142,6 +143,7 @@ class GraphData():
 
     def load_topics(self):
         topics = set()
+        self.ordered_paper_ids = order = []
         if self.nodes_path.suffix == ".content":
             with open(self.nodes_path, 'r') as f:
                 lines = f.readlines()
@@ -149,6 +151,7 @@ class GraphData():
                 paper_id, *_features, label = line.strip().split()
                 topics.add(label)
                 self.papers[paper_id].label = label
+                order.append(paper_id)
         elif self.nodes_path.suffix == ".tab":
             with open(self.nodes_path, 'r') as f:
                 lines = f.readlines()  # read the file
@@ -159,8 +162,11 @@ class GraphData():
                 topics.add(label)
                 paper_idx = int(paper_idx.strip().removeprefix("paper:"))  # make paper ID an int
                 self.papers[paper_idx].label = label  # associate paper ID (as int) with topic/label
+                order.append(paper_idx)
         self.topics = list(topics)
         self.mlb = MultiLabelBinarizer(classes=self.topics)
+        # force load order
+        self.papers = {k: self.papers[k] for k in order}
 
     def load_features(self):
         self.features = {}  # keyed on paper ID, value is the feature vector
