@@ -29,6 +29,8 @@ defaultconfig_path = wd / 'configs/default_config.yaml'
 # the per-dataset config is merged into this later
 default_config = yaml.load(open(defaultconfig_path, 'r'))
 
+do_print = False
+
 
 # from: https://stackoverflow.com/a/21894086/2712730
 class bidict(dict):
@@ -257,8 +259,9 @@ def make_graph(args, base_config=default_config):
     with open(args.config, 'r') as f:
         config.update(yaml.load(f))  # this config overrides entries in the default config
 
-    print(f"Loaded dataset-specific config from {args.config}")
-    print(f"This is the {config['dataset']} dataset over the {config['mode']} split.")
+    if do_print:
+        print(f"Loaded dataset-specific config from {args.config}")
+        print(f"This is the {config['dataset']} dataset over the {config['mode']} split.")
 
     # create a random generator seeded with the config seed
     graph = SGNN(name=config["dataset"], config=config)
@@ -284,7 +287,8 @@ def evaluate(bundles, processes=1, temp=None):
             temp.close()  # close the temp file
             os.unlink(temp.name)  # DON'T COMMENT OUT THIS.
     eval_time = time.time() - eval_time
-    print(f"Evaluation time: {eval_time} seconds")
+    if do_print:
+        print(f"Evaluation time: {eval_time} seconds")
     return x
 
 
@@ -361,7 +365,8 @@ def main(args):
     graph.resolution_order = resolution_order
 
     model_time = time.time() - model_time
-    print(f"Time to load dataset and create model: {model_time} seconds")
+    if do_print:
+        print(f"Time to load dataset and create model: {model_time} seconds")
 
     # save model to file for multiprocessing
     temp = tempfile.NamedTemporaryFile(delete=False)
@@ -372,9 +377,10 @@ def main(args):
     # create a list of (paper_id, pickled_file) tuples for multiprocessing
     bundles = [(paper_id, temp.name) for paper_id in papers]
 
-    print(graph.snn.pretty(10))
-    print("Topic breakdowns:")
-    print(graph.topic_breakdowns())
+    if do_print:
+        print(graph.snn.pretty(10))
+        print("Topic breakdowns:")
+        print(graph.topic_breakdowns())
     del papers, graph  # unload data and SNN to save memory
 
     # test loading the model from pickle
@@ -383,12 +389,14 @@ def main(args):
         d = pkl.load(f)
     del d
     load_time = time.time() - load_time
-    print(f"Time to load model from pickle: {load_time} seconds")
+    if do_print:
+        print(f"Time to load model from pickle: {load_time} seconds")
 
     x = evaluate(bundles, processes, temp)
 
     results = calculate_accuracy(x, resolution_order, mode.title())
-    print(results)
+    if do_print:
+        print(results)
 
     if config.get("dump_json", None):
         with open('results.json', 'a') as f:
@@ -400,6 +408,7 @@ def main(args):
 
 
 if __name__ == '__main__':
+    do_print = True
     print(f"Loaded base config from {defaultconfig_path}")
     parser = argparse.ArgumentParser()
     parser.add_argument('--backend', choices=["auto", "cpu", "jit", "gpu"])
