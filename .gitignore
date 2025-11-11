@@ -1,8 +1,38 @@
 /*.json
 wandb/
 
+# Mark's stuff
+/tmp.*
+/local
+*.log
+docker-nom/build/
+\#*\#
+.\#*
+
 # Mac stuff
 **/.DS_Store
+__MACOSX
+
+# Vim (and some others)
+*~
+*.swp
+
+# Sublime Text
+*.sublime-workspace
+
+# Intellij
+.idea/
+*.iws
+*.iml
+
+# vscode
+.vscode
+
+# dask
+dask-worker-space/
+
+# Generated data
+*.png
 
 ##
 ## BEGIN: PYTHON GITIGNORE
