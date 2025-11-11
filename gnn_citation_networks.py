@@ -263,7 +263,6 @@ def make_graph(args, base_config=default_config):
         print(f"Loaded dataset-specific config from {args.config}")
         print(f"This is the {config['dataset']} dataset over the {config['mode']} split.")
 
-    # create a random generator seeded with the config seed
     graph = SGNN(name=config["dataset"], config=config)
     graph.load_all()
     graph.make_network()
@@ -346,17 +345,29 @@ def calculate_accuracy(results, resolution_order, name=''):
     return Results(n=n, tp=tp, tn=tn, fp=fp, fn=fn, correct=correct, perfect=perfect, spikes=spikes, name=name, legacy=legacy)
 
 
+def make_temp_bundles(graph):
+    # save model to file for multiprocessing
+    temp = tempfile.NamedTemporaryFile(delete=False)
+    with open(temp.name, 'wb') as f:
+        pkl.dump(graph, f)
+    # create a list of (paper_id, pickled_file) tuples for multiprocessing
+    return temp, [(paper_id, temp.name) for paper_id in graph.selected_papers]
+
+
 def main(args):
 
     model_time = time.time()
 
     graph = make_graph(args)
+    model_time = time.time() - model_time
+    if do_print:
+        print(f"Time to load dataset and create model: {model_time} seconds")
+
     config = graph.config
     processes = graph.mp_processes(args.backend)
-    papers = graph.selected_papers
     mode = config['mode']
     if config['test_only_first']:
-        papers = papers[:config['test_only_first']]
+        graph.selected_papers = graph.selected_papers[:config['test_only_first']]
 
     # if there's a tie among topics, choose the topic closest to [0]
     # resolution_order = sorted(graph.topics, key=graph.topic_prevalence().get, reverse=True)  # sort topics by prevalence
@@ -364,24 +375,16 @@ def main(args):
     resolution_order = list(graph.topic_neurons)  # sort topics by load order
     graph.resolution_order = resolution_order
 
-    model_time = time.time() - model_time
-    if do_print:
-        print(f"Time to load dataset and create model: {model_time} seconds")
-
-    # save model to file for multiprocessing
-    temp = tempfile.NamedTemporaryFile(delete=False)
-    with open(temp.name, 'wb') as f:
-        pkl.dump(graph, f)
     # with open('model.json', 'w') as f:
-    #     graph.snn.saveas_json(f, array_representation="json-native")
-    # create a list of (paper_id, pickled_file) tuples for multiprocessing
-    bundles = [(paper_id, temp.name) for paper_id in papers]
+    #     graph.snn.saveas_json(f, array_representation="base85")
 
     if do_print:
         print(graph.snn.pretty(10))
         print("Topic breakdowns:")
         print(graph.topic_breakdowns())
-    del papers, graph  # unload data and SNN to save memory
+
+    temp, bundles = make_temp_bundles(graph)
+    del graph  # unload data and SNN to save memory
 
     # test loading the model from pickle
     load_time = time.time()
@@ -405,6 +408,42 @@ def main(args):
             }
             dump_data = config | accuracy
             json.dump(dump_data, f, indent=2)
+
+
+def main_parametrized(
+    override_config_path=None,
+    override_config=None,
+    backend=None,  # None: use config backend or auto-select in SNM
+    callback=None,
+    base_config=default_config):
+    config = base_config.copy()
+    if override_config_path:
+        with open(override_config_path, 'r') as f:
+            config.update(yaml.load(f))  # this config overrides entries in the default config
+    if override_config:
+        config.update(override_config)
+
+    graph = SGNN(name=config["dataset"], config=config)
+    graph.load_all()
+    graph.make_network()
+    processes = graph.mp_processes(backend)
+    mode = config['mode']
+    if config['test_only_first']:
+        graph.selected_papers = graph.selected_papers[:config['test_only_first']]
+
+    # if there's a tie among topics, choose by whichever was loaded first
+    order = graph.resolution_order = list(graph.topic_neurons)
+
+    if callable(callback):
+        # if callback returns a new order, use that
+        order = new if (new := callback(graph)) is not None else order
+
+    temp, bundles = make_temp_bundles(graph)
+    del graph  # unload data and SNN to save memory
+
+    x = evaluate(bundles, processes, temp)
+
+    return calculate_accuracy(x, order, mode.title())
 
 
 if __name__ == '__main__':
