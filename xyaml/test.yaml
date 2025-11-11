@@ -1,0 +1,11 @@
+---
+file: test.yaml
+example: !include foo.yaml
+value: !np complex('2+2j')
+complex: !np array(list(range(10)), dtype=float)
+angle: !np [radians(90 + 45), pi / 2, 3.14]
+# corrupt: !np (pi := 5) + pi  # assignment disallowed
+pi: !np pi
+agents:
+  - !include foo.yaml
+...
