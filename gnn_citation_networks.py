@@ -187,10 +187,6 @@ def test_paper(x):
     paper = graph.papers[paper_id]
     paper_neuron = graph.paper_neurons[paper_id]
 
-    if (r := graph.resolution_order):
-        # reorder topic_neurons by resolution order
-        topic_neurons = {k: topic_neurons[k] for k in r}
-
     snn.add_spike(0, paper_neuron, 100.0)
     snn.simulate(time_steps=graph.config["simtime"])
 
@@ -225,6 +221,10 @@ def test_paper(x):
         # choose papers with the highest score
         _best_topic, max_score = max(topic_scores, key=lambda x: x[1])
         ties = [topic for topic, score in topic_scores if score == max_score]
+
+    if (r := graph.resolution_order):
+        # reorder ties by resolution order
+        ties = [k for k in r if k in ties]
 
     actual_topic = paper.label
     total_spikes = snn.ispikes.sum()
@@ -299,6 +299,7 @@ class Results:
     perfect: int = 0
     spikes: tuple[np.ndarray, ...] = tuple()
     name: str = ''
+    legacy: int | None = None
 
     @property
     def accuracy(self):
@@ -325,6 +326,7 @@ class Results:
             f"F1:        {self.f1:.3f}",
             f"Positives: {self.correct} / {self.n} ({self.correct / self.n * 100:.2f}%)",
             f"Perfect:   {self.perfect} / {self.n} ({self.perfect / self.n * 100:.2f}%)",
+            f"Legacy:    {self.legacy} / {self.n} ({self.legacy / self.n * 100:.2f}%)" if self.legacy is not None else '',
             f"Total spikes: {np.sum(self.spikes)}",
         ])
 
@@ -336,7 +338,8 @@ def calculate_accuracy(results, resolution_order, name=''):
     tp, tn, fp, fn = score(results, resolution_order)
     correct = np.sum([ans in guesses for ans, guesses in results])
     perfect = np.sum([set([ans]) == set(guesses) for ans, guesses in results])
-    return Results(n=n, tp=tp, tn=tn, fp=fp, fn=fn, correct=correct, perfect=perfect, spikes=spikes, name=name)
+    legacy = np.sum([guesses[0] == ans for ans, guesses in results])
+    return Results(n=n, tp=tp, tn=tn, fp=fp, fn=fn, correct=correct, perfect=perfect, spikes=spikes, name=name, legacy=legacy)
 
 
 def main(args):
@@ -352,13 +355,14 @@ def main(args):
         papers = papers[:config['test_only_first']]
 
     # if there's a tie among topics, choose the topic closest to [0]
-    # resolution_order = sorted(topic_counts, key=topic_counts.get, reverse=True)  # sort topics by prevalence
+    # resolution_order = sorted(graph.topics, key=graph.topic_prevalence().get, reverse=True)  # sort topics by prevalence
     # resolution_order = reversed(list(graph.topic_neurons))  # sort topics by reverse load order
     resolution_order = list(graph.topic_neurons)  # sort topics by load order
     graph.resolution_order = resolution_order
 
     model_time = time.time() - model_time
     print(f"Time to load dataset and create model: {model_time} seconds")
+
     # save model to file for multiprocessing
     temp = tempfile.NamedTemporaryFile(delete=False)
     with open(temp.name, 'wb') as f:

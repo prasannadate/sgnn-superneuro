@@ -10,6 +10,8 @@ import networkx as nx
 import superneuromat as snm
 from sklearn.preprocessing import MultiLabelBinarizer
 
+from typing import Iterable
+
 Pname = str | int
 
 
@@ -36,7 +38,7 @@ class GraphData():
         self.config = config
         self.papers: dict[Pname, Paper] = {}
         self.topics: list[str] = []  # the list of topics
-        self.resolution_order: list[Pname] = []
+        self.resolution_order: Iterable[Pname] = []
         self._edges_path = None
         self._nodes_path = None
         self.data_root: pl.Path | None = pl.Path(expandvars(p)) if (p := config.get("data_root", None)) else None
