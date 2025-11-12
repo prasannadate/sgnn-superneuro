@@ -1,34 +1,67 @@
 dataset: pubmed  # Choices: ["cora", "citeseer", "pubmed", "microseer"]
 mode: validation  # Choices: ["validation", "test"]
-seed: 0
-features: 0  # Choices: [0,1]
-paper_leak: 0.0  # Choices: [1., 10., 100., 100000.]
-paper_threshold: 1.0  # Choices: [0.25, 0.5, 0.75, 1.0, 1.5]
-train_ref: 1  # Choices: [1.0, 5.0, 10.0, 100.0, 1000.0]
-feature_ref: 1  # Choices: [1.0, 5.0, 10.0, 100.0, 1000.0]
-validation_ref: 1000  # Choices: [1.0, 5.0, 10.0, 100.0, 1000.0]
-test_ref: 1000  # Same as validation_ref
-topic_leak: 0.0  # Choices: [1., 10., 100., 100000.]
-topic_threshold: 1.0  # Choices: [0.25, 0.5, 0.75, 1.0, 1.5]
-feature_leak: 0.0  # Choices: [1., 10., 100., 100000.]
-feature_threshold: 0.25  # Choices: [0.25, 0.5, 0.75, 1.0, 1.5]
-graph_weight: 100.0  # Choices: [0.5, 1.0, 10.0, 100.0]
-graph_delay: 1  # Choices: [1., 2., 5., 10., 20.]
-train_to_topic_weight: 1.0  # Choices: [0.5, 1.0, 10.0, 100.0]
-train_to_topic_delay: 1  # Choices: [1., 2., 5., 10., 20.]
-validation_to_topic_weight: 0.001  # Choices: [0.001, 0.005, 0.01, 0.05, 0.1]
-validation_to_topic_delay: 1  # Choices: [1., 2., 5., 10., 20.]
-test_to_topic_weight: 0.001  # Choices: [0.001, 0.005, 0.01, 0.05, 0.1]
-test_to_topic_delay: 1  # Choices: [1., 2., 5., 10., 20.]
-paper_to_feature_weight: 0.2  # Choices: [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
-feature_to_paper_weight: 0.2  # Choices: [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
-paper_to_feature_delay: 4  # Choices: [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0]
-simtime: 10  # Choices: [5., 10., 20., 30., 40., 50., 75., 100., 150., 200.]
-processes: 8  # Adjust based on machine capabilities
-monitors: False
-paper_to_feature_stdp: False
-paper_to_feature_weighted: False
-apos: [1.0, .5, .1, .01, .001]
-aneg: [-0.0001]
-stdp_timesteps: 5
-dump_json: 1
+nodes_path: Pubmed-Diabetes/data/Pubmed-Diabetes.NODE.paper.tab
+edges_path: Pubmed-Diabetes/data/Pubmed-Diabetes.DIRECTED.cites.tab
+
+# # these sizes are used to construct the network.
+# # train_size: 60
+# # validation_size: 60
+# # test_size: 1000
+# # note: specifying any of the above three lines will override the multipliers below
+# # They will be ignored if set to `null`
+# train_topics_mult: 20  # multiply by num_topics to get number of train papers
+# validation_topics_mult: 20  # multiply by num_topics to get number of val papers
+# pick_evenly:
+#   - train
+#   - validation
+#   - test
+#   - null  # this line lets you comment out any of the above three lines
+# test_only_first: 1000  # only evaluate the first 1000 papers in the selected set. Set to `false` or `null` to evaluate all papers in the selected set.
+# legacy_split: true  # if true, use the legacy split method
+# mode: validation
+# seed: 0
+
+# paper_threshold: 1.0  # Choices: [0.25, 0.5, 0.75, 1.0, 1.5]
+# paper_leak: 0.0  # Choices: [1., 10., 100., 100000.]
+# train_ref: 1  # Choices: [1.0, 5.0, 10.0, 100.0, 1000.0]
+# test_ref: 1000  # Same as validation_ref
+# validation_ref: 1000  # Choices: [1.0, 5.0, 10.0, 100.0, 1000.0]
+# topic_threshold: 1.0  # Choices: [0.25, 0.5, 0.75, 1.0, 1.5]
+# topic_leak: 0.0  # Choices: [1., 10., 100., 100000.]
+# graph_weight: 100.0  # Choices: [0.5, 1.0, 10.0, 100.0]
+# train_to_topic_weight: 1.0  # Choices: [0.5, 1.0, 10.0, 100.0]
+# test_to_topic_weight: 0.001  # Choices: [0.001, 0.005, 0.01, 0.05, 0.1]
+# validation_to_topic_weight: 0.001  # Choices: [0.001, 0.005, 0.01, 0.05, 0.1]
+# # keep delays at 1 for larger datasets or you may crash your computer
+# graph_delay: 1  # Choices: [1.]  # the paper-to-paper delay
+# train_to_topic_delay: 1  # Choices: [1.]
+# test_to_topic_delay: 1  # Choices: [1.]
+# validation_to_topic_delay: 1  # Choices: [1.]
+
+# features: false  # Choices: [0,1]
+# feature_to_topic: false  # should we create feature-to-topic synapses? no effect if features=false
+# feature_threshold: 0.25  # Choices: [0.25, 0.5, 0.75, 1.0, 1.5]
+# feature_leak: 0.0  # Choices: [1., 10., 100., 100000.]
+# feature_ref: 1  # Choices: [1.0, 5.0, 10.0, 100.0, 1000.0]
+# paper_to_feature_weight: 0.2  # Choices: [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+# feature_to_paper_weight: 0.2  # Choices: [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+# topic_to_feature_weight: 0.2  # Choices: [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+# feature_to_topic_weight: 0.2  # Choices: [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+# topic_to_feature_delay: 1  # Choices: [1.0]
+# feature_to_topic_delay: 1  # Choices: [1.0]
+# paper_to_feature_delay: 1  # Choices: [1.0]
+# feature_to_paper_delay: 1  # Choices: [1.0]
+# feature_to_topic_stdp: False
+# paper_to_feature_stdp: False
+# paper_to_feature_weighted: False
+
+# simtime: 10  # Choices: [5., 10., 20., 30., 40., 50., 75., 100., 150., 200.]
+# apos: [1.0, .5, .1, .01, .001]
+# aneg: !np "[-0.0001] * 5"
+# stdp_timesteps: 5
+backend: cpu
+# processes: auto  # Adjust based on machine capabilities
+gpu_processes: 2
+
+# monitors: False
+# dump_json: false
