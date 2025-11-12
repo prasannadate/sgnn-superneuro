@@ -12,7 +12,8 @@ from skopt.space import Categorical, Real
 import time
 
 # project specific pip imports
-from gnn_citation_networks import GraphData, test_paper
+from gnn_citation_networks import test_paper
+from graph_data import GraphData
 from utils import (
     parse_args,
     print_introduction,
@@ -71,7 +72,9 @@ def solve_gnn(arg1, arg2, arg3, arg4,
     if BO_TESTING_MODE:
         accuracy = np.random.rand()
     else:
-        graph = GraphData(local_config["dataset"], local_config)    
+        graph = GraphData(local_config["dataset"],
+                          seed=local_config['seed'],
+                          data_dir='./data')
 
         with Pool(local_config["processes"]) as pool:
             if local_config["mode"] == "validation":
