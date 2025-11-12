@@ -16,7 +16,9 @@ import numpy as np
 import superneuromat as snm
 # import matplotlib.pyplot as plt
 from tqdm.contrib.concurrent import process_map
+
 from graph_data import GraphData, Pname
+from utils import bidict
 
 # typing:
 from superneuromat import Neuron, Synapse
@@ -30,40 +32,6 @@ defaultconfig_path = wd / 'configs/default_config.yaml'
 default_config = yaml.load(open(defaultconfig_path, 'r'))
 
 do_print = False
-
-
-# from: https://stackoverflow.com/a/21894086/2712730
-class bidict(dict):
-    """Creates a dictionary that supports reverse lookups via the .inverse attribute.
-
-    Args:
-        dict (dict): The original dictionary.
-
-    Properties:
-        inverse (dict): A dictionary that maps values to keys.
-    """
-    def __new__(cls, *args, **kwargs):
-        d = super().__new__(cls, *args, **kwargs)
-        d.inverse = {}
-        return d
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.inverse = {}
-        for key, value in self.items():
-            self.inverse.setdefault(value, []).append(key)
-
-    def __setitem__(self, key, value):
-        if key in self:
-            self.inverse[self[key]].remove(key)
-        super().__setitem__(key, value)
-        self.inverse.setdefault(value, []).append(key)
-
-    def __delitem__(self, key):
-        self.inverse.setdefault(self[key], []).remove(key)
-        if self[key] in self.inverse and not self.inverse[self[key]]:
-            del self.inverse[self[key]]
-        super().__delitem__(key)
 
 
 class SGNN(GraphData):
