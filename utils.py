@@ -1,11 +1,19 @@
+from __future__ import annotations
+
+import sys
 import argparse
-import matplotlib.pyplot as plt
+
 import numpy as np
-import omegaconf
-from omegaconf import DictConfig, OmegaConf
-from sklearn.metrics import confusion_matrix, classification_report
 from tabulate import tabulate
-from typing import List, Tuple, Dict, Any
+import matplotlib.pyplot as plt
+from sklearn.metrics import confusion_matrix, classification_report
+
+# typing:
+from typing import Any, TYPE_CHECKING
+if TYPE_CHECKING:
+    from omegaconf import DictConfig, OmegaConf
+else:
+    DictConfig, OmegaConf = None, None
 
 
 def plot_confusion_matrix(cm, labels):
@@ -13,79 +21,13 @@ def plot_confusion_matrix(cm, labels):
     Plot the confusion matrix 'cm' with the given 'labels'.
     """
     fig, ax = plt.subplots()
-    cax = ax.matshow(cm, cmap=plt.cm.Blues)
+    cax = ax.matshow(cm, cmap=plt.cm.Blues)  # pyright: ignore[reportAttributeAccessIssue]
     fig.colorbar(cax)
     ax.set_xticks(np.arange(len(labels)))
     ax.set_yticks(np.arange(len(labels)))
     ax.set_xticklabels(labels, rotation=90)
     ax.set_yticklabels(labels)
 
-    for i in range(len(labels)):
-        for j in range(len(labels)):
-            ax.text(j, i, cm[i, j],
-                    ha="center", va="center",
-                    color="black")
-
-    plt.xlabel("Predicted")
-    plt.ylabel("True")
-    plt.show()
-
-
-def evaluate_predictions(graph, predictions):
-    """
-    Build true_labels and pred_labels from 'predictions', then print confusion matrix and classification report.
-    """
-    true_labels = []
-    pred_labels = []
-    
-    for (paper, predicted_topic, _) in predictions:
-        actual_topic = graph.paper_to_topic[paper]
-        true_labels.append(actual_topic)
-        pred_labels.append(predicted_topic)
-    
-    # Unique set of topics encountered
-    all_topics = list(set(true_labels + pred_labels))
-    
-    cm = confusion_matrix(true_labels, pred_labels, labels=all_topics)
-    print("Confusion Matrix:\n", cm)
-    
-    report = classification_report(true_labels, pred_labels, labels=all_topics, target_names=all_topics)
-    print("\nClassification Report:\n", report)
-    
-    # Optionally, plot confusion matrix:
-    plot_confusion_matrix(cm, all_topics)
-
-
-def print_paper_spikes(model, paper_neurons):
-    """
-    Print which paper neurons spiked at each time step, 
-    assuming model.spike_train[t] is a binary array 
-    indicating spike (1) or no spike (0) for each neuron.
-    """
-    for t, spike_array in enumerate(model.spike_train):
-        # 'spike_array' is presumably something like [0, 1, 0, 0, 1, ...]
-        spiking_papers = []
-        for paper_id, neuron_id in paper_neurons.items():
-            # Check if the value at index 'neuron_id' is 1 (i.e., a spike)
-            if spike_array[neuron_id] == 1:
-                spiking_papers.append(neuron_id)
-
-        if spiking_papers:
-            print(f"Time {t}: Paper Neurons that spiked: {spiking_papers}")
-
-
-def plot_confusion_matrix(cm, labels):
-    """
-    Plot the confusion matrix 'cm' with the given 'labels'.
-    """
-    fig, ax = plt.subplots()
-    cax = ax.matshow(cm, cmap=plt.cm.Blues)
-    fig.colorbar(cax)
-    ax.set_xticks(np.arange(len(labels)))
-    ax.set_yticks(np.arange(len(labels)))
-    ax.set_xticklabels(labels, rotation=90)
-    ax.set_yticklabels(labels)
-    
     # Print numeric values in the cells
     for i in range(len(labels)):
         for j in range(len(labels)):
@@ -97,7 +39,50 @@ def plot_confusion_matrix(cm, labels):
     plt.show()
 
 
-def parse_args() -> Tuple[argparse.Namespace, List[str]]:
+def evaluate_predictions(graph, predictions):
+    """
+    Build true_labels and pred_labels from 'predictions', then print confusion matrix and classification report.
+    """
+    true_labels = []
+    pred_labels = []
+
+    for (paper, predicted_topic, _) in predictions:
+        actual_topic = graph.paper_to_topic[paper]
+        true_labels.append(actual_topic)
+        pred_labels.append(predicted_topic)
+
+    # Unique set of topics encountered
+    all_topics = list(set(true_labels + pred_labels))
+
+    cm = confusion_matrix(true_labels, pred_labels, labels=all_topics)
+    print("Confusion Matrix:\n", cm)
+
+    report = classification_report(true_labels, pred_labels, labels=all_topics, target_names=all_topics)
+    print("\nClassification Report:\n", report)
+
+    # Optionally, plot confusion matrix:
+    plot_confusion_matrix(cm, all_topics)
+
+
+def print_paper_spikes(model, paper_neurons):
+    """
+    Print which paper neurons spiked at each time step,
+    assuming model.spike_train[t] is a binary array
+    indicating spike (1) or no spike (0) for each neuron.
+    """
+    for t, spike_array in enumerate(model.spike_train):
+        # 'spike_array' is presumably something like [0, 1, 0, 0, 1, ...]
+        spiking_papers = []
+        for _paper_id, neuron_id in paper_neurons.items():
+            # Check if the value at index 'neuron_id' is 1 (i.e., a spike)
+            if spike_array[neuron_id] == 1:
+                spiking_papers.append(neuron_id)
+
+        if spiking_papers:
+            print(f"Time {t}: Paper Neurons that spiked: {spiking_papers}")
+
+
+def parse_args() -> tuple[argparse.Namespace, list[str]]:
     """
     Parse command-line arguments.
 
@@ -111,7 +96,7 @@ def parse_args() -> Tuple[argparse.Namespace, List[str]]:
     return args, unknown_args
 
 
-def print_introduction(args: argparse.Namespace, config: omegaconf.DictConfig, kwargs: Dict[str, Any], delimiter: str = "*", delimiter_width: int = 80) -> None:
+def print_introduction(args: argparse.Namespace, config: DictConfig, kwargs: dict[str, Any], delimiter: str = "*", delimiter_width: int = 80) -> None:
     """
     Print an introduction with the default config and overridden values.
 
@@ -123,7 +108,7 @@ def print_introduction(args: argparse.Namespace, config: omegaconf.DictConfig, k
         delimiter_width (int, optional): Width of the delimiter line. Defaults to 80.
     Returns:
         None
-    
+
     """
     print(delimiter * delimiter_width)
     print(f"\nConfig file: {args.config}\n")
@@ -152,7 +137,7 @@ def print_introduction(args: argparse.Namespace, config: omegaconf.DictConfig, k
 
         # overridden_values_table = [[key, config[key], value] for key, value in kwargs.items()]
         print(tabulate(overridden_config_table, headers=["Key", "Original Value", "New Value"], tablefmt="grid"))
-    
+
     print()
     print(delimiter * delimiter_width)
 
