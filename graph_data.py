@@ -17,6 +17,7 @@ Pname = str | int
 
 @dataclass
 class Paper:
+    """Data structure for a single paper."""
     idx: str  # Paper ID
     label: str = ''  # Paper category/topic
     features: tuple[bool | int | float, ...] | list[bool | int | float]
@@ -32,6 +33,17 @@ class Paper:
 
 
 class GraphData():
+    """Loads and facilitates access to Citation Network data.
+
+    Handles loading of papers, topics, and features.
+    Also provides methods for selecting papers for training, validation, and test sets.
+
+    The ``config`` defines how the data should be loaded and split, and where the data is located.
+    See the ``configs/default_config.yaml`` file for an example.
+
+    The data is not loaded at instantiation.
+    Use the ``load_all()`` method to load all data and perform splits.
+    """
     def __init__(self, name, config, **kwargs):
         self.name = name
         config.update(kwargs)
@@ -259,8 +271,8 @@ class GraphData():
         pool = list(self.papers)
         self.rng.shuffle(pool)
 
-        # take & return the first `n` papers from the pool without replacement
         def select_papers(pool, n=1, removefrom=()):
+            """take & return the first `n` papers from the pool without replacement"""
             # bisect
             chosen, pool[:] = pool[0:n], pool[n:]
             # remove chosen papers from any auxiliary pools
@@ -270,6 +282,7 @@ class GraphData():
             return chosen
 
         def select_topics_evenly(pool, n):
+            """take `n` papers from the pool, evenly distributing them across topics as the stacks run out"""
             chosen = []
             topic_papers = {topic: [] for topic in self.topics}
 
@@ -305,7 +318,7 @@ class GraphData():
 
             return chosen
 
-        class Selector:
+        class Selector:  # chooses selection function based on if 'train'/'test'/'validation' is in config['pick_evenly']
             @classmethod
             def __getitem__(cls, name):
                 if name in self.config.get("pick_evenly", []):
@@ -339,6 +352,7 @@ class GraphData():
                             "Test set contains {len(self.test_papers)} papers.", RuntimeWarning, stacklevel=2)
 
     def topic_prevalence(self, papers=None):
+        """Count the number of papers in each topic."""
         if papers is None:
             papers = self.papers.values()
         topic_counts = {k: 0 for k in self.topics}  # create a dictionary with all topics as keys
@@ -348,6 +362,7 @@ class GraphData():
         return topic_counts
 
     def topic_breakdowns(self):
+        """Create a pandas DataFrame with the number of papers in each topic for all/test/train/validation sets."""
         import pandas as pd
         all_papers = self.topic_prevalence()
         test = self.topic_prevalence(self.test_papers)

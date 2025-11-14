@@ -7,21 +7,25 @@ import warnings
 import xyaml as yaml
 import pickle as pkl
 import pathlib as pl
+import multiprocessing
 from itertools import product
-from multiprocessing import Pool
 from dataclasses import dataclass, field
 
 import tqdm
 import numpy as np
 import superneuromat as snm
+from superneuromat.util import getenvbool
 # import matplotlib.pyplot as plt
 from tqdm.contrib.concurrent import process_map
 
-from graph_data import GraphData, Pname
+from graph_data import GraphData
 from utils import bidict
 
 # typing:
+from typing import Sequence, Any, TYPE_CHECKING, overload, IO
 from superneuromat import Neuron, Synapse
+from graph_data import Pname
+
 
 wd = pl.Path(__file__).parent.absolute()  # get the Path() of this python file
 
@@ -32,6 +36,13 @@ defaultconfig_path = wd / 'configs/default_config.yaml'
 default_config = yaml.load(open(defaultconfig_path, 'r'))
 
 do_print = False
+ENV_PICKLE = 'SGNN_USE_PICKLE'
+
+
+def unpack_single(func):
+    def wrapper(x):
+        return func(*x)
+    return wrapper
 
 
 class SGNN(GraphData):
@@ -142,27 +153,33 @@ class SGNN(GraphData):
             model.create_synapse(topic, feature, weight=cfg["feature_to_topic_weight"], delay=cfg["feature_to_topic_delay"], stdp_enabled=cfg['feature_to_topic_stdp'])
 
 
-def test_paper_from_pickle(x):
-    paper_id, temp = x
+def test_paper_from_pickle(paper_id: Pname, temp: str | os.PathLike):
+    # For Windows & MacOS, the spawned process needs to run the whole file from scratch.
+    # To skip the model loading overhead, this function loads a saved copy of the model from a pickle file.
     with open(temp, 'rb') as f:
         d = pkl.load(f)
-    return test_paper((paper_id, d))
+    return test_paper(paper_id, d)
 
 
-def test_paper(x):
-    paper_id, graph = x
-    graph: SGNN
+def test_paper_from_pickle1(x):
+    # multiprocessing needs a top-level function that only takes one argument.
+    paper_id, temp = x
+    return test_paper_from_pickle(paper_id, temp)
+
+
+def test_paper(paper_id: Pname, graph: SGNN):
+    """Infer the topic of a single paper.
+    Returns a tuple of (the ground-truth topic, a list of [ties]), and the spike count."""
     snn = graph.snn
-    topic_neurons = graph.topic_neurons
     paper = graph.papers[paper_id]
-    paper_neuron = graph.paper_neurons[paper_id]
+    paper_neuron: Neuron = graph.paper_neurons[paper_id]
 
     snn.add_spike(0, paper_neuron, 100.0)
     snn.simulate(time_steps=graph.config["simtime"])
 
     # Analyze the weights between the test paper neuron and topic neurons
     topic_weights = []
-    for topic_id, topic_paper_id in topic_neurons.items():
+    for topic_id, topic_paper_id in graph.topic_neurons.items():
         # Find the synapse from topic neuron to test paper neuron
         synapse = snn.get_synapse(paper_neuron, topic_paper_id)
         topic_weights.append((topic_id, synapse.weight))
@@ -185,7 +202,7 @@ def test_paper(x):
             score = 0
             for feature_neuron in feature_neurons:
                 paper_to_feature = snn.get_synapse(paper_neuron, feature_neuron)
-                feature_to_topic = snn.get_synapse(feature_neuron, topic_neurons[topic])
+                feature_to_topic = snn.get_synapse(feature_neuron, graph.topic_neurons[topic])
                 score += paper_to_feature.weight * feature_to_topic.weight
             topic_scores.append((topic, score))
         # choose papers with the highest score
@@ -201,8 +218,7 @@ def test_paper(x):
     snn.release_mem()
     del snn, graph
     # match = actual_topic == best_topic
-    ret = (actual_topic, ties)
-    return ret, total_spikes
+    return (actual_topic, ties), total_spikes
 
 
 def score(answers, topics):
@@ -223,6 +239,7 @@ def score(answers, topics):
 
 
 def make_graph(args, base_config=default_config):
+    """Create an SGNN object based on the config file."""
     config = base_config.copy()
     with open(args.config, 'r') as f:
         config.update(yaml.load(f))  # this config overrides entries in the default config
@@ -239,14 +256,27 @@ def make_graph(args, base_config=default_config):
 
 
 def evaluate(bundles, processes=1, temp=None):
-    # evaluate the model for each paper
+    """Evaluate all bundles to infer the topic of each paper.
+
+    Parallelizes the evaluation using the `process_map` function from `tqdm.contrib.concurrent`.
+    For each paper, in a separate thread, we load the model from the temporary file, and then run the simulation.
+
+    Args:
+        bundles (list[tuple[str | int, str | SGNN]]): List of tuples containing the paper ID
+            and the either the temporary file path or the SGNN object.
+        processes (int, optional): Number of processes to use for parallel evaluation. Defaults to 1.
+        temp (str, optional): Path to the temporary file. Defaults to None. Pass this if you want to evaluate
+            the model from the pickle file.
+    """
     eval_time = time.time()
     if processes == 1:
+        func = test_paper if temp is None else test_paper_from_pickle
         # single-process evaluation
-        x = [test_paper_from_pickle(bundle) for bundle in tqdm.tqdm(bundles)]
+        x = [func(*bundle) for bundle in tqdm.tqdm(bundles)]
     else:
+        func = test_paper if temp is None else test_paper_from_pickle1
         try:  # multi-process evaluation
-            x = process_map(test_paper_from_pickle, bundles, max_workers=processes, chunksize=1)  # with tqdm
+            x = process_map(func, bundles, max_workers=processes, chunksize=1)  # with tqdm
             # pool = Pool(2)
             # x = pool.map(test_paper, bundles)
             pass
@@ -257,6 +287,15 @@ def evaluate(bundles, processes=1, temp=None):
     if do_print:
         print(f"Evaluation time: {eval_time} seconds")
     return x
+
+
+if TYPE_CHECKING:
+    @overload
+    def evaluate(bundles: Sequence[tuple[Pname, str | os.PathLike]],
+                 processes=1, temp: IO = ...): ...  # type: ignore[override]
+    @overload
+    def evaluate(bundles: Sequence[tuple[Pname, SGNN]],
+                 processes=1, temp: None = None): ...
 
 
 @dataclass
@@ -313,8 +352,25 @@ def calculate_accuracy(results, resolution_order, name=''):
     return Results(n=n, tp=tp, tn=tn, fp=fp, fn=fn, correct=correct, perfect=perfect, spikes=spikes, name=name, legacy=legacy)
 
 
+def make_bundles(graph):
+    """Build a list of (paper_id, graph) tuples of papers to evaluate.
+    Each tuple contains arguments to pass to the ``test_paper(paper_id, graph)`` function."""
+    return [(paper_id, graph) for paper_id in graph.selected_papers]
+
+
 def make_temp_bundles(graph):
-    # save model to file for multiprocessing
+    """save model to file for multiprocessing.
+
+    This makes evaluation faster on MacOS and Windows due to the spawn multiprocessing method.
+    https://docs.python.org/3/library/multiprocessing.html#contexts-and-start-methods
+
+    On such platforms, the `fork` method is not available, so this entire file is run for each process.
+    Saving the model to a file allows us to simply load the file, instead of having to
+    re-create the entire model each time.
+
+    Returns  a list of (paper_id, graph) tuples of papers to evaluate.
+    Each tuple contains arguments to pass to the ``test_paper(paper_id, graph)`` function."
+    """
     temp = tempfile.NamedTemporaryFile(delete=False)
     with open(temp.name, 'wb') as f:
         pkl.dump(graph, f)
@@ -351,19 +407,28 @@ def main(args):
         print("Topic breakdowns:")
         print(graph.topic_breakdowns())
 
-    temp, bundles = make_temp_bundles(graph)
-    del graph  # unload data and SNN to save memory
+    use_pickle = (
+        x if (x := args.pickle) is not None else
+        x if (x := getenvbool(ENV_PICKLE, default=None)) is not None else
+        multiprocessing.get_start_method() == 'spawn'
+    )
 
-    # test loading the model from pickle
-    load_time = time.time()
-    with open(temp.name, 'rb') as f:
-        d = pkl.load(f)
-    del d
-    load_time = time.time() - load_time
-    if do_print:
-        print(f"Time to load model from pickle: {load_time} seconds")
+    if use_pickle:
+        temp, bundles = make_temp_bundles(graph)
+        del graph  # unload data and SNN to save memory
 
-    x = evaluate(bundles, processes, temp)
+        # test loading the model from pickle
+        load_time = time.time()
+        with open(temp.name, 'rb') as f:
+            d = pkl.load(f)
+        del d
+        load_time = time.time() - load_time
+        if do_print:
+            print(f"Time to load model from pickle: {load_time} seconds")
+
+        x = evaluate(bundles, processes, temp)
+    else:
+        x = evaluate(make_bundles(graph), processes)
 
     results = calculate_accuracy(x, resolution_order, mode.title())
     if do_print:
@@ -383,7 +448,23 @@ def main_parametrized(
     override_config=None,
     backend=None,  # None: use config backend or auto-select in SNM
     callback=None,
-    base_config=default_config):
+    pickle=None,
+    base_config=default_config
+):
+    """Run the main function with the given arguments.
+
+    Args:
+        override_config_path (str | None, optional): Path to a config file to override the default config. Defaults to None.
+        override_config (dict | None, optional):
+            Dictionary of additional config values. Entries will override those in ``override_config_path``. Defaults to None.
+        backend (str | None, optional): Backend to use for the SNN.
+            Defaults to None meaning use config value, or if that is also None or 'auto', asks SNM to auto-select the backend.
+        callback (callable | None, optional): Callback function to modify the graph or resolution order. Defaults to None.
+        pickle (str | None, optional): Force using (True) or not using (False) a pickle file for each evaluation.
+            Defaults to None, which means to either take the value of SGNN_USE_PICKLE environment variable if set.
+            Otherwise, the default is to use a pickle file to speed up evaluation on MacOS and Windows.
+        base_config (dict, optional): Base config to use. Defaults to ``default_config``.
+    """
     config = base_config.copy()
     if override_config_path:
         with open(override_config_path, 'r') as f:
@@ -406,10 +487,16 @@ def main_parametrized(
         # if callback returns a new order, use that
         order = new if (new := callback(graph)) is not None else order
 
-    temp, bundles = make_temp_bundles(graph)
-    del graph  # unload data and SNN to save memory
-
-    x = evaluate(bundles, processes, temp)
+    if (
+        pickle if pickle is not None else
+        x if (x := getenvbool(ENV_PICKLE, default=None)) is not None else
+        multiprocessing.get_start_method() == 'spawn'
+    ):
+        temp, bundles = make_temp_bundles(graph)
+        del graph  # unload data and SNN to save memory
+        x = evaluate(bundles, processes, temp)
+    else:
+        x = evaluate(make_bundles(graph), processes)
 
     return calculate_accuracy(x, order, mode.title())
 
@@ -424,5 +511,7 @@ if __name__ == '__main__':
     # parser.add_argument('--config', default=wd / 'configs/citeseer/default_citeseer_config.yaml')
     # parser.add_argument('--config', default=wd / 'configs/cora/default_cora_config.yaml')
     parser.add_argument('--config', default=wd / 'configs/pubmed/default_pubmed_config.yaml')
+    parser.add_argument('--pickle', action='store_true', default=None)
+    parser.add_argument('--nopickle', action='store_false', dest='pickle', default=None)
     args = parser.parse_args()
     main(args)
