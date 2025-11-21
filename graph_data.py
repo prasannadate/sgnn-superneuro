@@ -252,6 +252,7 @@ class GraphData():
                     and paper.idx not in used
                 ):
                     selected.append(paper.idx)
+                    used.add(paper.idx)
                     topic_counts[paper.label] += 1
                     attempts = 0
                 else:
