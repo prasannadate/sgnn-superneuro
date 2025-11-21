@@ -93,15 +93,18 @@ class GraphData():
     def nodes_path(self, path: os.PathLike):
         self._nodes_path = path
 
+    def remove_missing(self):
+        missing = [paper.idx for paper in self.papers.values() if not paper.label]
+        for paper in missing:
+            del self.papers[paper]
+
     def load_all(self, remove_missing=True):
         self.load_graph()
         self.load_papers()
         self.load_topics()
         # some papers appear as a citation but don't have a label. Remove those papers.
         if remove_missing:
-            missing = [paper.idx for paper in self.papers.values() if not paper.label]
-            for paper in missing:
-                del self.papers[paper]
+            self.remove_missing()
         if self.config['features']:
             self.load_features()
         if self.config['legacy_split']:
