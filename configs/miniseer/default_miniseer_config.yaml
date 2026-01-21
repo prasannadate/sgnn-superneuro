@@ -1,3 +1,7 @@
+# MiniSeer Dataset-specific configuration file for SGNN
+# used by `gnn_citation_networks.py`
+# Entries in this file OVERRIDE entries in default_config.yaml
+
 dataset: miniseer  # Choices: ["cora", "citeseer", "pubmed", "microseer", "miniseer"]
 nodes_path: miniseer/miniseer.content
 edges_path: miniseer/miniseer.cites

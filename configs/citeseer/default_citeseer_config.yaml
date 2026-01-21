@@ -1,3 +1,7 @@
+# CiteSeer Dataset-specific configuration file for SGNN
+# used by `gnn_citation_networks.py`
+# Entries in this file OVERRIDE entries in default_config.yaml
+
 dataset: citeseer  # Choices: ["cora", "citeseer", "pubmed", microseer]
 mode: validation  # Choices: ["validation", "test"]
 nodes_path: citeseer/citeseer.content

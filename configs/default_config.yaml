@@ -1,3 +1,7 @@
+# Base-level configuration file for SGNN
+# used by `gnn_citation_networks.py`
+# Entries in this file are overridden by entries in dataset-specific configuration files
+
 ## Data loading
 data_root: !relpath ../data  # path to the data directory
 ## these sizes are used to construct the network.
