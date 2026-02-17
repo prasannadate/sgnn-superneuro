@@ -167,6 +167,12 @@ def test_paper_from_pickle1(x):
     return test_paper_from_pickle(paper_id, temp)
 
 
+def test_paper1(x):
+    # multiprocessing needs a top-level function that only takes one argument.
+    paper_id, temp = x
+    return test_paper(paper_id, temp)
+
+
 def test_paper(paper_id: Pname, graph: SGNN):
     """Infer the topic of a single paper.
     Returns a tuple of (the ground-truth topic, a list of [ties]), and the spike count."""
@@ -274,7 +280,7 @@ def evaluate(bundles, processes=1, temp=None):
         # single-process evaluation
         x = [func(*bundle) for bundle in tqdm.tqdm(bundles)]
     else:
-        func = test_paper if temp is None else test_paper_from_pickle1
+        func = test_paper1 if temp is None else test_paper_from_pickle1
         try:  # multi-process evaluation
             x = process_map(func, bundles, max_workers=processes, chunksize=1)  # with tqdm
             # pool = Pool(2)
