@@ -287,8 +287,9 @@ def evaluate(bundles, processes=1, temp=None):
             # x = pool.map(test_paper, bundles)
             pass
         finally:  # clean up and delete the temp file no matter what
-            temp.close()  # close the temp file
-            os.unlink(temp.name)  # DON'T COMMENT OUT THIS.
+            if temp is not None:
+                temp.close()  # close the temp file
+                os.unlink(temp.name)  # DON'T COMMENT OUT THIS.
     eval_time = time.time() - eval_time
     if do_print:
         print(f"Evaluation time: {eval_time} seconds")
