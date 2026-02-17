@@ -244,14 +244,39 @@ def score(answers, topics):
     return tp, tn, fp, fn
 
 
-def make_graph(args, base_config=default_config):
-    """Create an SGNN object based on the config file."""
+def make_graph(override_dict_or_path: argparse.Namespace | os.PathLike | str | dict,
+               base_config=default_config):
+    """Create an SGNN object based on the config file.
+
+    Parameters
+    ----------
+    override_dict_or_path : argparse.Namespace | os.PathLike | str | dict
+        Either a dictionary of config values to override the default config,
+        or a path to a config file,
+        or an argparse.Namespace containing a `config` key (which is a path to a config file).
+    base_config : dict, optional
+        Base config to use. Defaults to ``default_config``.
+
+    Returns
+    -------
+    graph : SGNN
+        The SGNN object.
+    """
     config = base_config.copy()
-    with open(args.config, 'r') as f:
-        config.update(yaml.load(f))  # this config overrides entries in the default config
+
+    if not isinstance(override_dict_or_path, dict):
+        # assume it's a path to a config file
+        path = override_dict_or_path.config if isinstance(override_dict_or_path, argparse.Namespace) else override_dict_or_path
+        with open(path, 'r') as f:
+            override_dict_or_path = yaml.load(f)
+    else:
+        path = None
+
+    config.update(override_dict_or_path)  # this config overrides entries in the default config
 
     if do_print:
-        print(f"Loaded dataset-specific config from {args.config}")
+        if path is not None:
+            print(f"Loaded dataset-specific config from {path}")
         print(f"This is the {config['dataset']} dataset over the {config['mode']} split.")
 
     graph = SGNN(name=config["dataset"], config=config)
