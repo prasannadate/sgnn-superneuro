@@ -14,6 +14,22 @@ from typing import Iterable
 
 Pname = str | int
 
+import torch
+import numpy as np
+
+# --- CRITICAL FIX for PyTorch >= 2.6 + OGB MAG240M ---
+_original_torch_load = torch.load
+
+def patched_torch_load(*args, **kwargs):
+    # Force legacy behavior so OGB split_dict.pt can load
+    if "weights_only" not in kwargs:
+        kwargs["weights_only"] = False
+    return _original_torch_load(*args, **kwargs)
+
+torch.load = patched_torch_load
+# -----------------------------------------------------
+
+
 
 @dataclass
 class Paper:
@@ -57,6 +73,7 @@ class GraphData():
         self.data_root: pl.Path | None = pl.Path(expandvars(p)) if (p := config.get("data_root", None)) else None
         self.edges_path = expandvars(self.config["edges_path"])
         self.nodes_path = expandvars(self.config["nodes_path"])
+        self.nodes_feature_path = expandvars(self.config["nodes_features_path"])
         self.train_papers: list[Pname] = []
         self.validation_papers: list[Pname] = []
         self.test_papers: list[Pname] = []
@@ -102,6 +119,7 @@ class GraphData():
         self.load_graph()
         self.load_papers()
         self.load_topics()
+        print("Papers, topics and connectivit added in graph.")
         # some papers appear as a citation but don't have a label. Remove those papers.
         if remove_missing:
             self.remove_missing()
@@ -178,6 +196,11 @@ class GraphData():
                 paper_idx = int(paper_idx.strip().removeprefix("paper:"))  # make paper ID an int
                 self.papers[paper_idx].label = label  # associate paper ID (as int) with topic/label
                 order.append(paper_idx)
+        #########################################################
+        #### Case for MAG240M dataset:
+        elif self.nodes_path.suffix == ".npy":
+            topics = np.arange(dataset.num_classes)
+        #########################################################
         self.topics = list(topics)
         self.mlb = MultiLabelBinarizer(classes=self.topics)
         # force load order
@@ -207,6 +230,11 @@ class GraphData():
                 paper_id, _topic, *features, summary = fields  # extract paper name and topic/label
                 paper_id = int(paper_id.strip().removeprefix("paper:"))  # make paper ID an int
                 self.papers[paper_id].features = [int(name in summary) for name in all_features]  # convert to binary features
+         #########################################################
+        #### Case for MAG240M dataset:
+        elif self.nodes_feature_path.suffix == ".npy":
+            sel.paper[paper_id].features = np.load(self.nodes_feature_path) # dataset.num_paper_features, /lustre/orion/lrn088/scratch/srk20/data/mag240m_kddcup2021/processed/paper/node_feat.npy
+        #########################################################
 
         self.num_features = len(self.papers[paper_id].features)
 
@@ -224,6 +252,18 @@ class GraphData():
             self.graph = nx.read_edgelist(self.edges_path)
         elif self.edges_path.suffix == ".tab":
             self.graph = nx.from_edgelist(self.read_directed_cites_tab(self.edges_path))
+        ##################################
+        ##### FOR MAG20M:
+        elif self.edges_path.suffix == ".npy":
+            from ogb.lsc import MAG240MDataset
+            DATA_ROOT="/lustre/orion/lrn088/scratch/srk20/data/"
+            dataset = MAG240MDataset(root=DATA_ROOT)
+            print("Location of edges:",self.edges_path)
+            #self.graph = nx.from_edgelist(np.load(self.edges_path))
+            edge_index_cites = dataset.edge_index('paper', 'paper')
+            edge_list = list(zip(edge_index_cites[0], edge_index_cites[1]))
+            self.graph = nx.Graph(edge_list)
+        #####################################
 
     def load_papers(self):
         for paper in self.graph.nodes:
