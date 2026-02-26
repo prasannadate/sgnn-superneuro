@@ -27,6 +27,9 @@ def patched_torch_load(*args, **kwargs):
     return _original_torch_load(*args, **kwargs)
 
 torch.load = patched_torch_load
+
+from ogb.lsc import MAG240MDataset
+DATA_ROOT="/lustre/orion/lrn088/scratch/srk20/data/"
 # -----------------------------------------------------
 
 
@@ -116,10 +119,13 @@ class GraphData():
             del self.papers[paper]
 
     def load_all(self, remove_missing=True):
+        if self.config["dataset"]=="mag240m":
+            self.dataset = MAG240MDataset(root=DATA_ROOT)
+
         self.load_graph()
         self.load_papers()
         self.load_topics()
-        print("Papers, topics and connectivit added in graph.")
+        print("Papers, topics and connectivity added in GraphData object.")
         # some papers appear as a citation but don't have a label. Remove those papers.
         if remove_missing:
             self.remove_missing()
@@ -198,8 +204,10 @@ class GraphData():
                 order.append(paper_idx)
         #########################################################
         #### Case for MAG240M dataset:
-        elif self.nodes_path.suffix == ".npy":
-            topics = np.arange(dataset.num_classes)
+        #elif self.nodes_path.suffix == ".npy":
+        elif self.config["dataset"] == "mag240m":
+            topics = np.arange(self.dataset.num_classes)
+            print("MAG240M topics:", topics)
         #########################################################
         self.topics = list(topics)
         self.mlb = MultiLabelBinarizer(classes=self.topics)
@@ -255,21 +263,34 @@ class GraphData():
         ##################################
         ##### FOR MAG20M:
         elif self.edges_path.suffix == ".npy":
-            from ogb.lsc import MAG240MDataset
-            DATA_ROOT="/lustre/orion/lrn088/scratch/srk20/data/"
-            dataset = MAG240MDataset(root=DATA_ROOT)
-            print("Location of edges:",self.edges_path)
+            #print("Location of edges:",self.edges_path)
             #self.graph = nx.from_edgelist(np.load(self.edges_path))
-            edge_index_cites = dataset.edge_index('paper', 'paper')
-            edge_list = list(zip(edge_index_cites[0], edge_index_cites[1]))
-            self.graph = nx.Graph(edge_list)
+            edge_index_cites = self.dataset.edge_index('paper', 'paper')
+            #edge_list = list(zip(edge_index_cites[0], edge_index_cites[1]))
+            #self.graph = nx.Graph(edge_list)
+            self.graph = edge_index_cites   # np.ndarray
         #####################################
 
     def load_papers(self):
+        if self.config["dataset"]=="mag240m":
+            self.papers = {}
+            for k in range(self.dataset.num_papers):
+                self.papers[k]=Paper(k)
+            return
+
         for paper in self.graph.nodes:
             self.papers[paper] = Paper(paper)
 
     def train_val_test_split_legacy(self):
+        if self.config["dataset"]=="mag240m":
+            split_dict = self.dataset.get_idx_split()
+            self.train_papers = split_dict['train'] # numpy array storing indices of training paper nodes
+            self.validation_papers = split_dict['valid'] # numpy array storing indices of validation paper nodes
+            self.test_papers = split_dict['test-dev'] # numpy array storing indices of test-dev paper nodes
+            self.testchallenge_papers = split_dict['test-challenge'] # numpy array storing indices of test-challenge paper nodes
+
+            return
+
         if (pick_evenly := self.config.get('pick_evenly', None)) is not None:
             pick_evenly = set(pick_evenly) - {'null', None}
             if pick_evenly != {'train', 'validation'}:

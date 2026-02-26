@@ -96,17 +96,31 @@ class SGNN(GraphData):
             neuron = model.create_neuron(threshold=cfg["topic_threshold"], leak=cfg["topic_leak"], refractory_period=0)
             self.topic_neurons[t] = neuron
 
+        print(f"Created paper and topic neurons {len(self.paper_neurons)} + {len(self.topic_neurons)}")
+
         # Create bi-directional synapse for each edge in the graph
-        for edge in self.graph.edges:
-            paper, cited = edge
-            if paper not in self.paper_neurons or cited not in self.paper_neurons:
-                continue
-            pre = self.paper_neurons[paper]
-            post = self.paper_neurons[cited]
-            if pre == post:
-                continue
-            model.create_synapse(pre, post, weight=cfg["graph_weight"], delay=cfg["graph_delay"])
-            model.create_synapse(post, pre, weight=cfg["graph_weight"], delay=cfg["graph_delay"])
+        if self.config["dataset"]=="mag240m":
+            for k in range(self.graph.shape[1]):
+                paper, cited = self.graph[:,k]
+                if paper not in self.paper_neurons or cited not in self.paper_neurons:
+                    continue
+                pre = self.paper_neurons[paper]
+                post = self.paper_neurons[cited]
+                if pre == post:
+                    continue
+                model.create_synapse(pre, post, weight=cfg["graph_weight"], delay=cfg["graph_delay"])
+                model.create_synapse(post, pre, weight=cfg["graph_weight"], delay=cfg["graph_delay"])
+        else:
+            for edge in self.graph.edges:
+                paper, cited = edge
+                if paper not in self.paper_neurons or cited not in self.paper_neurons:
+                    continue
+                pre = self.paper_neurons[paper]
+                post = self.paper_neurons[cited]
+                if pre == post:
+                    continue
+                model.create_synapse(pre, post, weight=cfg["graph_weight"], delay=cfg["graph_delay"])
+                model.create_synapse(post, pre, weight=cfg["graph_weight"], delay=cfg["graph_delay"])
 
         for paper in self.train_papers:
             p = self.paper_neurons[paper]
