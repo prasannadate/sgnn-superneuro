@@ -17,6 +17,8 @@ Pname = str | int
 import torch
 import numpy as np
 
+from tqdm import tqdm
+
 # --- CRITICAL FIX for PyTorch >= 2.6 + OGB MAG240M ---
 _original_torch_load = torch.load
 
@@ -72,7 +74,7 @@ class GraphData():
         self.topics: list[str] = []  # the list of topics
         self.resolution_order: Iterable[Pname] = []
         self._edges_path = None
-        self._nodes_path = None
+        self._nodPnamees_path = None
         self.data_root: pl.Path | None = pl.Path(expandvars(p)) if (p := config.get("data_root", None)) else None
         self.edges_path = expandvars(self.config["edges_path"])
         self.nodes_path = expandvars(self.config["nodes_path"])
@@ -208,11 +210,21 @@ class GraphData():
         elif self.config["dataset"] == "mag240m":
             topics = np.arange(self.dataset.num_classes)
             print("MAG240M topics:", topics)
+            for k in tqdm(range(self.dataset.num_papers)):
+                #self.papers[k].label = -1
+                assert self.papers[k]
+                assert self.papers[k].label == ""
+                #self.papers[k].label = self.dataset.paper_label[k]
+                a = self.dataset.paper_label[k]
+
+
+                #order.append(k)
         #########################################################
         self.topics = list(topics)
         self.mlb = MultiLabelBinarizer(classes=self.topics)
         # force load order
-        self.papers = {k: self.papers[k] for k in order}
+        if not self.config["dataset"]=="mag240m":
+            self.papers = {k: self.papers[k] for k in order}
 
     def load_features(self):
         self.features = {}  # keyed on paper ID, value is the feature vector
@@ -241,7 +253,7 @@ class GraphData():
          #########################################################
         #### Case for MAG240M dataset:
         elif self.nodes_feature_path.suffix == ".npy":
-            sel.paper[paper_id].features = np.load(self.nodes_feature_path) # dataset.num_paper_features, /lustre/orion/lrn088/scratch/srk20/data/mag240m_kddcup2021/processed/paper/node_feat.npy
+            self.paper[paper_id].features = np.load(self.nodes_feature_path) # dataset.num_paper_features, /lustre/orion/lrn088/scratch/srk20/data/mag240m_kddcup2021/processed/paper/node_feat.npy
         #########################################################
 
         self.num_features = len(self.papers[paper_id].features)
@@ -269,13 +281,21 @@ class GraphData():
             #edge_list = list(zip(edge_index_cites[0], edge_index_cites[1]))
             #self.graph = nx.Graph(edge_list)
             self.graph = edge_index_cites   # np.ndarray
+        print('Loaded the citation graph edges')
+        print(f"Graph size: {len(self.graph)}")
         #####################################
 
     def load_papers(self):
         if self.config["dataset"]=="mag240m":
             self.papers = {}
-            for k in range(self.dataset.num_papers):
+            for k in tqdm(range(self.dataset.num_papers)):
                 self.papers[k]=Paper(k)
+                self.papers[k].label = ""
+                assert self.papers[k]
+                assert self.papers[k].label == ""
+                #if k>10000:
+                #    break
+            print('Papers loaded')
             return
 
         for paper in self.graph.nodes:

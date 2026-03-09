@@ -42,7 +42,7 @@ graph_weight: 10.0  # Choices: [0.5, 1.0, 10.0, 100.0]
 # test_to_topic_delay: 1  # Choices: [1.]
 # validation_to_topic_delay: 1  # Choices: [1.]
 
-# features: false  # Choices: [0,1]
+features: false  # Choices: [0,1]
 # feature_to_topic: false  # should we create feature-to-topic synapses? no effect if features=false
 # feature_threshold: 0.25  # Choices: [0.25, 0.5, 0.75, 1.0, 1.5]
 # feature_leak: 0.0  # Choices: [1., 10., 100., 100000.]

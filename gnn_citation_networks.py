@@ -108,8 +108,12 @@ class SGNN(GraphData):
                 post = self.paper_neurons[cited]
                 if pre == post:
                     continue
-                model.create_synapse(pre, post, weight=cfg["graph_weight"], delay=cfg["graph_delay"])
-                model.create_synapse(post, pre, weight=cfg["graph_weight"], delay=cfg["graph_delay"])
+                print(f"Edge {k}: Paper {paper}{pre} connects paper {cited} {post}")
+                model.create_synapse(pre, post, weight=cfg["graph_weight"], delay=cfg["graph_delay"], exist="overwrite")
+                model.create_synapse(post, pre, weight=cfg["graph_weight"], delay=cfg["graph_delay"], exist="overwrite")
+
+                if k>1000:
+                    break   #FIXME: For inital debug
         else:
             for edge in self.graph.edges:
                 paper, cited = edge
@@ -432,6 +436,8 @@ def main(args):
     model_time = time.time() - model_time
     if do_print:
         print(f"Time to load dataset and create model: {model_time} seconds")
+
+    sys.exit()
 
     config = graph.config
     processes = graph.mp_processes(args.backend)
