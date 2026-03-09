@@ -422,8 +422,6 @@ def main(args):
     config = graph.config
     processes = graph.mp_processes(args.backend)
     mode = config['mode']
-    if config['test_only_first']:
-        graph.selected_papers = graph.selected_papers[:config['test_only_first']]
 
     # if there's a tie among topics, choose the topic closest to [0]
     # resolution_order = sorted(graph.topics, key=graph.topic_prevalence().get, reverse=True)  # sort topics by prevalence
@@ -509,8 +507,6 @@ def main_parametrized(
     graph.make_network()
     processes = graph.mp_processes(backend)
     mode = config['mode']
-    if config['test_only_first']:
-        graph.selected_papers = graph.selected_papers[:config['test_only_first']]
 
     # if there's a tie among topics, choose by whichever was loaded first
     order = graph.resolution_order = list(graph.topic_neurons)

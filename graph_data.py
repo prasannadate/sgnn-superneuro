@@ -123,6 +123,9 @@ class GraphData():
         else:
             self.selected_papers = []
 
+        if self.config['test_only_first']:
+            self.selected_papers = self.selected_papers[:self.config['test_only_first']]
+
     @property
     def seed(self):
         return self._seed
