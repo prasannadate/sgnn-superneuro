@@ -211,11 +211,16 @@ class GraphData():
             topics = np.arange(self.dataset.num_classes)
             print("MAG240M topics:", topics)
             for k in tqdm(range(self.dataset.num_papers)):
-                #self.papers[k].label = -1
-                assert self.papers[k]
-                assert self.papers[k].label == ""
+                self.papers[k].label = -1
+                #assert self.papers[k]
+                #assert self.papers[k].label == ""
                 #self.papers[k].label = self.dataset.paper_label[k]
-                a = self.dataset.paper_label[k]
+                #a = self.dataset.paper_label[k]
+                if k in self.train_papers:
+                    self.papers[k].label = self.dataset.paper_label[k]
+
+                if k in self.validation_papers:
+                    self.papers[k].label = self.dataset.paper_label[k]
 
 
                 #order.append(k)
@@ -290,9 +295,9 @@ class GraphData():
             self.papers = {}
             for k in tqdm(range(self.dataset.num_papers)):
                 self.papers[k]=Paper(k)
-                self.papers[k].label = ""
-                assert self.papers[k]
-                assert self.papers[k].label == ""
+                #self.papers[k].label = ""
+                #assert self.papers[k]
+                #assert self.papers[k].label == ""
                 #if k>10000:
                 #    break
             print('Papers loaded')
