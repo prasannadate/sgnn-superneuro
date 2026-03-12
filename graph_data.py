@@ -123,20 +123,22 @@ class GraphData():
     def load_all(self, remove_missing=True):
         if self.config["dataset"]=="mag240m":
             self.dataset = MAG240MDataset(root=DATA_ROOT)
+            self.train_val_test_split_legacy()
 
         self.load_graph()
         self.load_papers()
         self.load_topics()
         print("Papers, topics and connectivity added in GraphData object.")
         # some papers appear as a citation but don't have a label. Remove those papers.
-        if remove_missing:
-            self.remove_missing()
-        if self.config['features']:
-            self.load_features()
-        if self.config['legacy_split']:
-            self.train_val_test_split_legacy()
-        else:
-            self.train_val_test_split()
+        if self.config["dataset"]!="mag240m":
+            if remove_missing:
+                self.remove_missing()
+            if self.config['features']:
+                self.load_features()
+            if self.config['legacy_split']:
+                self.train_val_test_split_legacy()
+            else:
+                self.train_val_test_split()
         self.select_papers(self.config['mode'])
 
     def select_papers(self, mode):
@@ -210,18 +212,25 @@ class GraphData():
         elif self.config["dataset"] == "mag240m":
             topics = np.arange(self.dataset.num_classes)
             print("MAG240M topics:", topics)
+            #train_labels = np.array(list(self.dataset.paper_label[self.train_papers]),dtype=np.int64)
+            #val_labels = np.array(list(self.dataset.paper_label[self.validation_papers]),dtype=np.int64)
+            train_labels = self.dataset.paper_label[self.train_papers]
+            validation_labels = self.dataset.paper_label[self.validation_papers]
             for k in tqdm(range(self.dataset.num_papers)):
                 self.papers[k].label = -1
                 #assert self.papers[k]
                 #assert self.papers[k].label == ""
                 #self.papers[k].label = self.dataset.paper_label[k]
                 #a = self.dataset.paper_label[k]
-                if k in self.train_papers:
-                    self.papers[k].label = self.dataset.paper_label[k]
+                #if k in self.train_papers:
+                #    self.papers[k].label = train_labels[k]
 
-                if k in self.validation_papers:
-                    self.papers[k].label = self.dataset.paper_label[k]
-
+                #if k in self.validation_papers:
+                #    self.papers[k].label = self.dataset.paper_label[k]
+            for idx, label in tqdm(zip(self.train_papers, train_labels)):
+                self.papers[idx].label = label
+            for idx, label in tqdm(zip(self.validation_papers, validation_labels)):
+                self.papers[idx].label = label
 
                 #order.append(k)
         #########################################################
