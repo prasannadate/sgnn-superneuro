@@ -99,21 +99,51 @@ class SGNN(GraphData):
         print(f"Created paper and topic neurons {len(self.paper_neurons)} + {len(self.topic_neurons)}")
 
         # Create bi-directional synapse for each edge in the graph
-        if self.config["dataset"]=="mag240m":
-            for k in range(self.graph.shape[1]):
-                paper, cited = self.graph[:,k]
-                if paper not in self.paper_neurons or cited not in self.paper_neurons:
-                    continue
-                pre = self.paper_neurons[paper]
-                post = self.paper_neurons[cited]
-                if pre == post:
-                    continue
-                print(f"Edge {k}: Paper {paper}{pre} connects paper {cited} {post}")
-                model.create_synapse(pre, post, weight=cfg["graph_weight"], delay=cfg["graph_delay"], exist="overwrite")
-                model.create_synapse(post, pre, weight=cfg["graph_weight"], delay=cfg["graph_delay"], exist="overwrite")
+        if self.config["dataset"] == "mag240m":
 
-                if k>1000:
-                    break   #FIXME: For inital debug
+            cfg = self.config
+
+            # Graph format assumed: [2, num_edges]
+            papers = self.graph[0]
+            cited = self.graph[1]
+
+            # Build fast lookup table from paper_id -> neuron_id
+            #max_paper_id = max(self.paper_neurons.keys()) + 1
+            max_paper_id = int(self.graph.max()) + 1
+            paper_to_neuron = np.full(max_paper_id, -1, dtype=np.int32)
+
+            for paper_id, neuron_id in self.paper_neurons.items():
+                paper_to_neuron[paper_id] = neuron_id
+
+            # Convert papers to neuron ids
+            pre = paper_to_neuron[papers]
+            post = paper_to_neuron[cited]
+
+            # Filter valid edges
+            valid = (pre != -1) & (post != -1) & (pre != post)
+
+            pre = pre[valid]
+            post = post[valid]
+
+            print(f"Total valid MAG240M edges: {len(pre)}")
+
+            # Create synapses
+            for p, q in zip(pre, post):
+                model.create_synapse(
+                    p,
+                    q,
+                    weight=cfg["graph_weight"],
+                    delay=cfg["graph_delay"],
+                    exist="overwrite",
+                )
+
+                model.create_synapse(
+                    q,
+                    p,
+                    weight=cfg["graph_weight"],
+                    delay=cfg["graph_delay"],
+                    exist="overwrite",
+                )        
         else:
             for edge in self.graph.edges:
                 paper, cited = edge
