@@ -31,7 +31,7 @@ def patched_torch_load(*args, **kwargs):
 torch.load = patched_torch_load
 
 from ogb.lsc import MAG240MDataset
-DATA_ROOT="/lustre/orion/lrn088/scratch/srk20/data/"
+DATA_ROOT="/lustre/orion/world-shared/lrn088/datasets/" 
 # -----------------------------------------------------
 
 
