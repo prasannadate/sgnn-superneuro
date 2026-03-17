@@ -75,21 +75,38 @@ class SGNN(GraphData):
         validation_papers = set(self.validation_papers)
         test_papers = set(self.test_papers)
 
+        #unlabelled_paper = set()
+
         # set the apos and aneg values for STDP
         self.snn.apos = self.config["apos"]
         self.snn.aneg = self.config["aneg"]
 
         cfg = self.config
         # Create a neuron for each paper
-        for paper in train_papers:
-            self.paper_neurons[paper] = model.create_neuron(
-                threshold=cfg["paper_threshold"], leak=cfg["paper_leak"], refractory_period=cfg["train_ref"])
-        for paper in validation_papers:
-            self.paper_neurons[paper] = model.create_neuron(
-                threshold=cfg["paper_threshold"], leak=cfg["paper_leak"], refractory_period=cfg["validation_ref"])
-        for paper in test_papers:
-            self.paper_neurons[paper] = model.create_neuron(
-                threshold=cfg["paper_threshold"], leak=cfg["paper_leak"], refractory_period=cfg["test_ref"])
+        #for paper in train_papers:
+        #    self.paper_neurons[paper] = model.create_neuron(
+        #        threshold=cfg["paper_threshold"], leak=cfg["paper_leak"], refractory_period=cfg["train_ref"])
+        #for paper in validation_papers:
+        #    self.paper_neurons[paper] = model.create_neuron(
+        #        threshold=cfg["paper_threshold"], leak=cfg["paper_leak"], refractory_period=cfg["validation_ref"])
+        #for paper in test_papers:
+        #    self.paper_neurons[paper] = model.create_neuron(
+        #        threshold=cfg["paper_threshold"], leak=cfg["paper_leak"], refractory_period=cfg["test_ref"])
+
+        for paper in tqdm.tqdm(self.papers):
+            if paper in train_papers:
+                 self.paper_neurons[paper] = model.create_neuron(
+                    threshold=cfg["paper_threshold"], leak=cfg["paper_leak"], refractory_period=cfg["train_ref"])
+            elif paper in validation_papers:
+                self.paper_neurons[paper] = model.create_neuron(
+                    threshold=cfg["paper_threshold"], leak=cfg["paper_leak"], refractory_period=cfg["validation_ref"])
+            elif paper in test_papers:
+                self.paper_neurons[paper] = model.create_neuron(
+                    threshold=cfg["paper_threshold"], leak=cfg["paper_leak"], refractory_period=cfg["test_ref"])
+            else:
+                self.paper_neurons[paper] = model.create_neuron(
+                    threshold=cfg["paper_threshold"], leak=cfg["paper_leak"], refractory_period=cfg["test_ref"])
+
 
         # Create a neuron for each topic
         for t in self.topics:
@@ -108,8 +125,10 @@ class SGNN(GraphData):
             cited = self.graph[1]
 
             # Build fast lookup table from paper_id -> neuron_id
-            #max_paper_id = max(self.paper_neurons.keys()) + 1
-            max_paper_id = int(self.graph.max()) + 1
+            max_paper_id = max(self.paper_neurons.keys()) + 1
+            print(f" Max paper id: {max_paper_id}")
+
+            #max_paper_id = int(self.graph.max()) + 1
             paper_to_neuron = np.full(max_paper_id, -1, dtype=np.int32)
 
             for paper_id, neuron_id in self.paper_neurons.items():
@@ -128,7 +147,7 @@ class SGNN(GraphData):
             print(f"Total valid MAG240M edges: {len(pre)}")
 
             # Create synapses
-            for p, q in zip(pre, post):
+            for p, q in tqdm.tqdm(zip(pre, post), total=len(pre)):
                 model.create_synapse(
                     p,
                     q,
@@ -467,7 +486,11 @@ def main(args):
     if do_print:
         print(f"Time to load dataset and create model: {model_time} seconds")
 
-    sys.exit()
+    print(f"Saving the model file as a pickle.")
+    with open('mag_snm_model.pkl', 'wb') as f:
+        pickle.dump(graph, f)
+    print("Data saved successfully to mag_snm_model.pkl")
+    #sys.exit()
 
     config = graph.config
     processes = graph.mp_processes(args.backend)
