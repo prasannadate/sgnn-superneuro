@@ -6,13 +6,13 @@ paper_leak: 0.0  # Choices: [1., 10., 100., 100000.]
 paper_threshold: 1.0  # Choices: [0.25, 0.5, 0.75, 1.0, 1.5]
 train_ref: 1  # Choices: [1.0, 5.0, 10.0, 100.0, 1000.0]
 feature_ref: 1  # Choices: [1.0, 5.0, 10.0, 100.0, 1000.0]
-validation_ref: 1000  # Choices: [1.0, 5.0, 10.0, 100.0, 1000.0]
-test_ref: 1000  # Same as validation_ref
+validation_ref: 1  # Choices: [1.0, 5.0, 10.0, 100.0, 1000.0]
+test_ref: 1  # Same as validation_ref
 topic_leak: 0.0  # Choices: [1., 10., 100., 100000.]
 topic_threshold: 1.0  # Choices: [0.25, 0.5, 0.75, 1.0, 1.5]
 feature_leak: 0.0  # Choices: [1., 10., 100., 100000.]
-feature_threshold: 0.25  # Choices: [0.25, 0.5, 0.75, 1.0, 1.5]
-graph_weight: 100.0  # Choices: [0.5, 1.0, 10.0, 100.0]
+feature_threshold: 1000  # Choices: [0.25, 0.5, 0.75, 1.0, 1.5]
+graph_weight: 1.1  # Choices: [0.5, 1.0, 10.0, 100.0]
 graph_delay: 1  # Choices: [1., 2., 5., 10., 20.]
 train_to_topic_weight: 1.0  # Choices: [0.5, 1.0, 10.0, 100.0]
 train_to_topic_delay: 1  # Choices: [1., 2., 5., 10., 20.]
@@ -33,7 +33,7 @@ monitors: False
 paper_to_feature_stdp: True
 paper_to_feature_weighted: True
 apos: [1.0, .5, .1, .01, .001]
-aneg: [.0001]
+aneg: [-0.0001]
 stdp_timesteps: 5
 dump_json: 1
 
