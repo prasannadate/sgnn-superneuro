@@ -98,52 +98,467 @@ class SGNN(GraphData):
 
         print(f"Created paper and topic neurons {len(self.paper_neurons)} + {len(self.topic_neurons)}")
 
-        # Create bi-directional synapse for each edge in the graph
+        num_papers = int(self.graph.max()) + 1
+
+        mask = np.zeros(num_papers, dtype=bool)
+
+        mask[self.train_papers] = True
+        mask[self.validation_papers] = True
+        mask[self.test_papers] = True
+
+        remaining_papers = np.nonzero(~mask)[0]
+
+        print(f"Remaining papers: {len(remaining_papers)}")
+        # Create neurons in batch
+        neurons = [model.create_neuron(
+            threshold=cfg["paper_threshold"],
+            leak=cfg["paper_leak"],
+            refractory_period=cfg["test_ref"]
+        ) for _ in range(len(remaining_papers))]
+
+        # Map neurons
+        for paper, neuron in zip(remaining_papers, neurons):
+            self.paper_neurons[paper] = neuron
+
+        #for paper in tqdm.tqdm(remaining_papers):
+        #    self.paper_neurons[paper] = model.create_neuron(
+        #        threshold=cfg["paper_threshold"],
+        #        leak=cfg["paper_leak"],
+        #        refractory_period=cfg["test_ref"],
+        #    )
+
         if self.config["dataset"] == "mag240m":
+
+            import os, gc, psutil
+
+            def print_mem(prefix=""):
+                process = psutil.Process(os.getpid())
+                print(f"{prefix} RAM: {process.memory_info().rss / 1e9:.2f} GB")
 
             cfg = self.config
 
-            # Graph format assumed: [2, num_edges]
             papers = self.graph[0]
             cited = self.graph[1]
 
-            # Build fast lookup table from paper_id -> neuron_id
-            #max_paper_id = max(self.paper_neurons.keys()) + 1
-            max_paper_id = int(self.graph.max()) + 1
-            paper_to_neuron = np.full(max_paper_id, -1, dtype=np.int32)
+            num_edges = papers.shape[0]
+
+            NUM_PAPERS = 121751666
+
+            syn_file = "/lustre/orion/lrn088/proj-shared/HyperNeuro/gautama/synapses.bin"
+
+            # ----------------------------------------
+            # Build lookup
+            # ----------------------------------------
+            print_mem("Before lookup")
+
+            paper_to_neuron = np.full(NUM_PAPERS, -1, dtype=np.int32)
 
             for paper_id, neuron_id in self.paper_neurons.items():
                 paper_to_neuron[paper_id] = neuron_id
 
-            # Convert papers to neuron ids
-            pre = paper_to_neuron[papers]
-            post = paper_to_neuron[cited]
+            print("Lookup built")
+            print_mem("After lookup")
 
-            # Filter valid edges
-            valid = (pre != -1) & (post != -1) & (pre != post)
+            # ========================================
+            # PHASE 1: BUILD FILE (ONLY IF NEEDED)
+            # ========================================
+            if not os.path.exists(syn_file):
 
-            pre = pre[valid]
-            post = post[valid]
+                print("synapses.bin not found → building...")
 
-            print(f"Total valid MAG240M edges: {len(pre)}")
+                fout = open(syn_file, "ab")
 
-            # Create synapses
-            for p, q in zip(pre, post):
-                model.create_synapse(
-                    p,
-                    q,
-                    weight=cfg["graph_weight"],
-                    delay=cfg["graph_delay"],
-                    exist="overwrite",
-                )
+                chunk_size = 5_000_000
+                buffer_size = 2_000_000
 
-                model.create_synapse(
-                    q,
-                    p,
-                    weight=cfg["graph_weight"],
-                    delay=cfg["graph_delay"],
-                    exist="overwrite",
-                )        
+                buf = np.empty((buffer_size, 2), dtype=np.int32)
+                buf_idx = 0
+
+                total_valid = 0
+
+                for chunk_id, start in enumerate(tqdm.tqdm(range(0, num_edges, chunk_size))):
+
+                    end = min(start + chunk_size, num_edges)
+
+                    p_chunk = papers[start:end]
+                    c_chunk = cited[start:end]
+
+                    pre = paper_to_neuron[p_chunk]
+                    post = paper_to_neuron[c_chunk]
+
+                    for i in range(len(pre)):
+                        p = pre[i]
+                        q = post[i]
+
+                        if p == -1 or q == -1 or p == q:
+                            continue
+
+                        buf[buf_idx] = (p, q)
+                        buf_idx += 1
+
+                        buf[buf_idx] = (q, p)
+                        buf_idx += 1
+
+                        total_valid += 1
+
+                        if buf_idx >= buffer_size:
+                            buf[:buf_idx].tofile(fout)
+                            buf_idx = 0
+
+                    if chunk_id % 10 == 0:
+                        print_mem(f"Build chunk {chunk_id}")
+
+                    del p_chunk, c_chunk, pre, post
+                    gc.collect()
+
+                if buf_idx > 0:
+                    buf[:buf_idx].tofile(fout)
+
+                fout.close()
+
+                print(f"Synapse file built. Total edges: {total_valid}")
+                print_mem("After build")
+
+            else:
+                print("synapses.bin found → skipping build")
+
+            # ========================================
+            # PHASE 2: LOAD INTO MODEL (OPTIMIZED)
+            # ========================================
+            print("Loading synapses into model...")
+
+            create = model.create_synapse
+
+            # cast once → cheaper than per-call conversion
+            weight = np.int16(cfg["graph_weight"])
+            delay = np.int16(cfg["graph_delay"])
+
+            fin = open(syn_file, "rb")
+
+            chunk_synapses = 40_000_000   # increase for fewer iterations
+
+            chunk_counter = 0
+
+            while True:
+
+                arr = np.fromfile(fin, dtype=np.int32, count=chunk_synapses * 2)
+
+                if arr.size == 0:
+                    break
+
+                # flat iteration (NO reshape)
+                for i in range(0, arr.size, 2):
+                    p = arr[i]
+                    q = arr[i+1]
+
+                    create(p, q, weight=weight, delay=delay, exist="overwrite")
+
+                if chunk_counter % 5 == 0:
+                    print(f"Loaded {arr.size // 2:,} synapses (chunk {chunk_counter})")
+                    print_mem("During load")
+
+                chunk_counter += 1
+
+                del arr
+                gc.collect()
+
+            fin.close()
+
+            print("All synapses loaded")
+            print_mem("After full load")
+
+        if self.config["dataset"] == "qmag240m":
+
+            import gc, psutil, os
+
+            def print_mem(prefix=""):
+                process = psutil.Process(os.getpid())
+                print(f"{prefix} RAM: {process.memory_info().rss / 1e9:.2f} GB")
+
+            cfg = self.config
+
+            papers = self.graph[0]
+            cited = self.graph[1]
+
+            num_edges = papers.shape[0]
+
+            NUM_PAPERS = 121751666
+
+            print_mem("Before lookup")
+
+            # ----------------------------------------
+            # Build lookup
+            # ----------------------------------------
+            paper_to_neuron = np.full(NUM_PAPERS, -1, dtype=np.int32)
+
+            for paper_id, neuron_id in self.paper_neurons.items():
+                paper_to_neuron[paper_id] = neuron_id
+
+            print("Lookup built")
+            print_mem("After lookup")
+
+            # ----------------------------------------
+            # PHASE 1: BUILD SYNAPSE FILE
+            # ----------------------------------------
+            syn_file = "/lustre/orion/lrn088/proj-shared/HyperNeuro/gautama/synapses.bin"
+
+            if os.path.exists(syn_file):
+                os.remove(syn_file)
+
+            fout = open(syn_file, "ab")
+
+            chunk_size = 5_000_000
+            buffer_size = 2_000_000
+
+            buf = np.empty((buffer_size, 2), dtype=np.int32)
+            buf_idx = 0
+
+            total_valid = 0
+
+            print("Starting streaming synapse build...")
+
+            for chunk_id, start in enumerate(tqdm.tqdm(range(0, num_edges, chunk_size))):
+
+                end = min(start + chunk_size, num_edges)
+
+                p_chunk = papers[start:end]
+                c_chunk = cited[start:end]
+
+                pre = paper_to_neuron[p_chunk]
+                post = paper_to_neuron[c_chunk]
+
+                for i in range(len(pre)):
+                    p = pre[i]
+                    q = post[i]
+
+                    if p == -1 or q == -1 or p == q:
+                        continue
+
+                    buf[buf_idx] = (p, q)
+                    buf_idx += 1
+
+                    buf[buf_idx] = (q, p)
+                    buf_idx += 1
+
+                    total_valid += 1
+
+                    if buf_idx >= buffer_size:
+                        buf[:buf_idx].tofile(fout)
+                        buf_idx = 0
+
+                if chunk_id % 5 == 0:
+                    print_mem(f"Build chunk {chunk_id}")
+
+                del p_chunk, c_chunk, pre, post
+                gc.collect()
+
+            if buf_idx > 0:
+                buf[:buf_idx].tofile(fout)
+
+            fout.close()
+
+            print(f"Synapse file built. Total edges: {total_valid}")
+            print_mem("After build")
+
+            # ----------------------------------------
+            # PHASE 2: LOAD INTO MODEL
+            # ----------------------------------------
+            print("Loading synapses into model...")
+
+            create_synapse = model.create_synapse
+            weight = cfg["graph_weight"]
+            delay = cfg["graph_delay"]
+
+            fin = open(syn_file, "rb")
+
+            load_chunk_edges = 2_000_000
+
+            while True:
+                arr = np.fromfile(fin, dtype=np.int32, count=load_chunk_edges * 2)
+
+                if arr.size == 0:
+                    break
+
+                arr = arr.reshape(-1, 2)
+
+                for i in range(arr.shape[0]):
+                    p = arr[i, 0]
+                    q = arr[i, 1]
+
+                    create_synapse(p, q, weight=weight, delay=delay, exist="overwrite")
+
+                print(f"Loaded {arr.shape[0]:,} synapses")
+                print_mem("During load")
+
+                del arr
+                gc.collect()
+
+            fin.close()
+
+            print("All synapses loaded")
+            print_mem("After full load")
+
+        elif self.config["dataset"] == "pmag240m":
+
+            import gc
+            import psutil
+            import os
+            
+            cfg = self.config
+
+            papers = self.graph[0]
+            cited = self.graph[1]
+
+            num_edges = papers.shape[0]
+
+            # Known constant for MAG240M
+            NUM_PAPERS = 121751666
+
+            # ---------------------------------------------------
+            # Memory monitor
+            # ---------------------------------------------------
+            def print_mem(prefix=""):
+                process = psutil.Process(os.getpid())
+                mem_gb = process.memory_info().rss / 1e9
+                print(f"{prefix} RAM usage: {mem_gb:.2f} GB")
+
+            print_mem("Before lookup build")
+
+            # ---------------------------------------------------
+            # Build lookup table
+            # ---------------------------------------------------
+            paper_to_neuron = np.full(NUM_PAPERS, -1, dtype=np.int32)
+
+            for paper_id, neuron_id in self.paper_neurons.items():
+                paper_to_neuron[paper_id] = neuron_id
+
+            print("Paper→Neuron lookup built")
+            print_mem("After lookup build")
+
+            # ---------------------------------------------------
+            # Pre-bind for speed
+            # ---------------------------------------------------
+            create_synapse = model.create_synapse
+            weight = cfg["graph_weight"]
+            delay = cfg["graph_delay"]
+
+            # ---------------------------------------------------
+            # IMPORTANT: safe chunk size
+            # ---------------------------------------------------
+            chunk_size = 40_000_000   # DO NOT increase for now
+
+            total_valid = 0
+
+            # ---------------------------------------------------
+            # Main loop
+            # ---------------------------------------------------
+            for chunk_id, start in enumerate(tqdm.tqdm(range(0, num_edges, chunk_size))):
+
+                end = min(start + chunk_size, num_edges)
+
+                # Load chunk (memmap-friendly)
+                p_chunk = papers[start:end]
+                c_chunk = cited[start:end]
+
+                # Map to neuron IDs
+                pre = paper_to_neuron[p_chunk]
+                post = paper_to_neuron[c_chunk]
+
+                # ---------------------------------------------------
+                # STREAM PROCESSING (NO LARGE FILTER ARRAYS)
+                # ---------------------------------------------------
+                valid_count = 0
+
+                for i in range(len(pre)):
+                    p = pre[i]
+                    q = post[i]
+
+                    if p == -1 or q == -1 or p == q:
+                        continue
+
+                    create_synapse(p, q, weight=weight, delay=delay, exist="overwrite")
+                    create_synapse(q, p, weight=weight, delay=delay, exist="overwrite")
+
+                    valid_count += 1
+
+                total_valid += valid_count
+
+                # ---------------------------------------------------
+                # Logging
+                # ---------------------------------------------------
+                print(f"Processed edges {start:,} → {end:,} | valid edges: {valid_count:,}")
+
+                # Print memory every few chunks
+                if chunk_id % 5 == 0:
+                    print_mem(f"After chunk {chunk_id}")
+
+                # ---------------------------------------------------
+                # CRITICAL: free memory
+                # ---------------------------------------------------
+                del p_chunk, c_chunk, pre, post
+                gc.collect()
+
+            print(f"Total valid MAG240M edges: {total_valid}")
+            print_mem("Final")
+
+
+        elif self.config["dataset"] == "omag240m":
+
+            cfg = self.config
+
+            papers = self.graph[0]
+            cited = self.graph[1]
+
+            num_edges = papers.shape[0]
+
+            NUM_PAPERS = 121751666
+
+            # lookup table
+            paper_to_neuron = np.full(NUM_PAPERS, -1, dtype=np.int32)
+
+            for paper_id, neuron_id in self.paper_neurons.items():
+                paper_to_neuron[paper_id] = neuron_id
+
+            print("Paper→Neuron lookup built")
+
+            create_synapse = model.create_synapse
+            weight = cfg["graph_weight"]
+            delay = cfg["graph_delay"]
+
+            chunk_size = 10_000_000  # tune for memory/cache
+
+            total_valid = 0
+
+            for start in tqdm.tqdm(range(0, num_edges, chunk_size)):
+
+                end = min(start + chunk_size, num_edges)
+
+                p_chunk = papers[start:end]
+                c_chunk = cited[start:end]
+
+                pre = paper_to_neuron[p_chunk]
+                post = paper_to_neuron[c_chunk]
+
+                valid = (pre != -1) & (post != -1) & (pre != post)
+
+                pre = pre[valid]
+                post = post[valid]
+
+                total_valid += len(pre)
+
+                for i in range(len(pre)):
+
+                    p = pre[i]
+                    q = post[i]
+
+                    create_synapse(p, q, weight=weight, delay=delay, exist="overwrite")
+                    create_synapse(q, p, weight=weight, delay=delay, exist="overwrite")
+
+                print(f"Processed edges {start:,} → {end:,}")
+
+            print(f"Total valid MAG240M edges: {total_valid}")
+        # Create bi-directional synapse for each edge in the graph
+      
         else:
             for edge in self.graph.edges:
                 paper, cited = edge
@@ -466,8 +881,12 @@ def main(args):
     model_time = time.time() - model_time
     if do_print:
         print(f"Time to load dataset and create model: {model_time} seconds")
+    
+    import pickle
 
-    sys.exit()
+    with open("mag240m_snn_model.pkl", "wb") as f:
+        pickle.dump(graph, f, protocol=pickle.HIGHEST_PROTOCOL)
+    #sys.exit()
 
     config = graph.config
     processes = graph.mp_processes(args.backend)
