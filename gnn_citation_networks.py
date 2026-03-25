@@ -75,6 +75,8 @@ class SGNN(GraphData):
         #validation_papers = set(self.validation_papers)
         #test_papers = set(self.test_papers)
 
+        #unlabelled_paper = set()
+
         # set the apos and aneg values for STDP
         #self.snn.apos = self.config["apos"]
         #self.snn.aneg = self.config["aneg"]
@@ -82,6 +84,7 @@ class SGNN(GraphData):
         cfg = self.config
         # Create a neuron for each paper
         #for paper in train_papers:
+
 #            self.paper_neurons[paper] = model.create_neuron(
         #        threshold=cfg["paper_threshold"], leak=cfg["paper_leak"], refractory_period=cfg["train_ref"])
         #for paper in validation_papers:
@@ -90,7 +93,6 @@ class SGNN(GraphData):
         #for paper in test_papers:
         #    self.paper_neurons[paper] = model.create_neuron(
         #        threshold=cfg["paper_threshold"], leak=cfg["paper_leak"], refractory_period=cfg["test_ref"])
-
         # Create a neuron for each topic
         #for t in self.topics:
         #    neuron = model.create_neuron(threshold=cfg["topic_threshold"], leak=cfg["topic_leak"], refractory_period=0)
@@ -326,6 +328,7 @@ class SGNN(GraphData):
             papers = self.graph[0]
             cited = self.graph[1]
 
+
             num_edges = papers.shape[0]
 
             NUM_PAPERS = 121751666
@@ -338,7 +341,6 @@ class SGNN(GraphData):
             print_mem("Before lookup")
 
             paper_to_neuron = np.full(NUM_PAPERS, -1, dtype=np.int32)
-
             for paper_id, neuron_id in self.paper_neurons.items():
                 paper_to_neuron[paper_id] = neuron_id
 
@@ -356,7 +358,6 @@ class SGNN(GraphData):
 
                 chunk_size = 5_000_000
                 buffer_size = 2_000_000
-
                 buf = np.empty((buffer_size, 2), dtype=np.int32)
                 buf_idx = 0
 
@@ -910,9 +911,10 @@ def main(args):
     
     import pickle
 
+
     with open("mag240m_snn_model.pkl", "wb") as f:
         pickle.dump(graph, f, protocol=pickle.HIGHEST_PROTOCOL)
-    #sys.exit()
+   #sys.exit()
 
     config = graph.config
     processes = graph.mp_processes(args.backend)
