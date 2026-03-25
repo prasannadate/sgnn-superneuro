@@ -136,7 +136,8 @@ class SGNN(GraphData):
             import numpy as np
             import os
 
-            stdp_syn_file = "/lustre/orion/lrn088/proj-shared/HyperNeuro/gautama/topic_stdp.bin"
+            stdp_syn_file = "/lustre/orion/lrn088/proj-shared/HyperNeuro/srk20/citation_graph/mag_synapses/topic_stdp.bin"
+            #stdp_syn_file = "/lustre/orion/lrn088/proj-shared/HyperNeuro/gautama/topic_stdp.bin"
 
             if os.path.exists(stdp_syn_file):
                 os.remove(stdp_syn_file)
@@ -167,6 +168,7 @@ class SGNN(GraphData):
 
                 # p → t
                 if buf_idx >= buffer_size:
+                    print(f"buffer to be written: {buf[:buf_idx]}, {buf_idx}")
                     buf[:buf_idx].tofile(fout)
                     buf_idx = 0
                 buf[buf_idx] = (paper, topic_neuron, stdp_off)

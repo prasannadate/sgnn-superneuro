@@ -28,17 +28,17 @@ nodes_features_path: /lustre/orion/world-shared/lrn088/datasets/mag240m_kddcup20
 # legacy_split: true  # if true, use the legacy split method
 # seed: 0
 
-# paper_threshold: 1.0  # Choices: [0.25, 0.5, 0.75, 1.0, 1.5]
-# paper_leak: 0.0  # Choices: [1., 10., 100., 100000.]
-# train_ref: 1  # Choices: [1.0, 5.0, 10.0, 100.0, 1000.0]
-# test_ref: 1000  # Same as validation_ref
-# validation_ref: 1000  # Choices: [1.0, 5.0, 10.0, 100.0, 1000.0]
+paper_threshold: 1.0  # Choices: [0.25, 0.5, 0.75, 1.0, 1.5]
+paper_leak: 0.0  # Choices: [1., 10., 100., 100000.]
+#train_ref: 1  # Choices: [1.0, 5.0, 10.0, 100.0, 1000.0]
+#test_ref: 1000  # Same as validation_ref
+#validation_ref: 1000  # Choices: [1.0, 5.0, 10.0, 100.0, 1000.0]
 topic_threshold: 0.5  # Choices: [0.25, 0.5, 0.75, 1.0, 1.5]
-# topic_leak: 0.0  # Choices: [1., 10., 100., 100000.]
+topic_leak: 0.0  # Choices: [1., 10., 100., 100000.]
 graph_weight: 10.0  # Choices: [0.5, 1.0, 10.0, 100.0]
-# train_to_topic_weight: 1.0  # Choices: [0.5, 1.0, 10.0, 100.0]
-# test_to_topic_weight: 0.001  # Choices: [0.001, 0.005, 0.01, 0.05, 0.1]
-# validation_to_topic_weight: 0.001  # Choices: [0.001, 0.005, 0.01, 0.05, 0.1]
+train_to_topic_weight: 1.0  # Choices: [0.5, 1.0, 10.0, 100.0]
+test_to_topic_weight: 0.001  # Choices: [0.001, 0.005, 0.01, 0.05, 0.1]
+validation_to_topic_weight: 0.001  # Choices: [0.001, 0.005, 0.01, 0.05, 0.1]
 # # keep delays at 1 for larger datasets or you may crash your computer
 # graph_delay: 1  # Choices: [1.]  # the paper-to-paper delay
 # train_to_topic_delay: 1  # Choices: [1.]
@@ -72,3 +72,13 @@ gpu_processes: 4
 
 # monitors: False
 # dump_json: false
+
+num_papers: 121751665
+paper_ref: 1000
+topic_ref: 5
+num_topics: 153
+#paper_weight_file: /lustre/orion/proj-shared/lrn088/HyperNeuro/srk20/citation_graph/mag_synapses/synapses.bin  # (2 columns: pre, post)
+paper_weight_file: /lustre/orion/world-shared/lrn088/datasets/mag240m_kddcup2021/processed/paper___cites___paper/edge_index.npy
+topic_paper_weight_file: /lustre/orion/proj-shared/lrn088/HyperNeuro/srk20/citation_graph/mag_synapses/paper_to_topic.bin #topic_synapses.bin #(2 or 3 columns: pre, post, [optional weight])
+paper_topic_stdp_file: /lustre/orion/proj-shared/lrn088/HyperNeuro/srk20/citation_graph/mag_synapses/topic_stdp.bin #(global IDs; 2 or 3 columns)
+stdp_enabled: True  #(optional bool; default false)
