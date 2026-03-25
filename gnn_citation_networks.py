@@ -10,7 +10,7 @@ import pathlib as pl
 import multiprocessing
 from itertools import product
 from dataclasses import dataclass, field
-
+import os
 import tqdm
 import numpy as np
 import superneuromat as snm
@@ -71,54 +71,54 @@ class SGNN(GraphData):
     def make_network(self):
         model = self.snn
         # create sets for faster __contains__ lookup
-        train_papers = set(self.train_papers)
-        validation_papers = set(self.validation_papers)
-        test_papers = set(self.test_papers)
+        #train_papers = set(self.train_papers)
+        #validation_papers = set(self.validation_papers)
+        #test_papers = set(self.test_papers)
 
         # set the apos and aneg values for STDP
-        self.snn.apos = self.config["apos"]
-        self.snn.aneg = self.config["aneg"]
+        #self.snn.apos = self.config["apos"]
+        #self.snn.aneg = self.config["aneg"]
 
         cfg = self.config
         # Create a neuron for each paper
-        for paper in train_papers:
-            self.paper_neurons[paper] = model.create_neuron(
-                threshold=cfg["paper_threshold"], leak=cfg["paper_leak"], refractory_period=cfg["train_ref"])
-        for paper in validation_papers:
-            self.paper_neurons[paper] = model.create_neuron(
-                threshold=cfg["paper_threshold"], leak=cfg["paper_leak"], refractory_period=cfg["validation_ref"])
-        for paper in test_papers:
-            self.paper_neurons[paper] = model.create_neuron(
-                threshold=cfg["paper_threshold"], leak=cfg["paper_leak"], refractory_period=cfg["test_ref"])
+        #for paper in train_papers:
+#            self.paper_neurons[paper] = model.create_neuron(
+        #        threshold=cfg["paper_threshold"], leak=cfg["paper_leak"], refractory_period=cfg["train_ref"])
+        #for paper in validation_papers:
+        #    self.paper_neurons[paper] = model.create_neuron(
+        #        threshold=cfg["paper_threshold"], leak=cfg["paper_leak"], refractory_period=cfg["validation_ref"])
+        #for paper in test_papers:
+        #    self.paper_neurons[paper] = model.create_neuron(
+        #        threshold=cfg["paper_threshold"], leak=cfg["paper_leak"], refractory_period=cfg["test_ref"])
 
         # Create a neuron for each topic
-        for t in self.topics:
-            neuron = model.create_neuron(threshold=cfg["topic_threshold"], leak=cfg["topic_leak"], refractory_period=0)
-            self.topic_neurons[t] = neuron
+        #for t in self.topics:
+        #    neuron = model.create_neuron(threshold=cfg["topic_threshold"], leak=cfg["topic_leak"], refractory_period=0)
+        #    self.topic_neurons[t] = neuron
 
         print(f"Created paper and topic neurons {len(self.paper_neurons)} + {len(self.topic_neurons)}")
 
         num_papers = int(self.graph.max()) + 1
 
-        mask = np.zeros(num_papers, dtype=bool)
+        #mask = np.zeros(num_papers, dtype=bool)
 
-        mask[self.train_papers] = True
-        mask[self.validation_papers] = True
-        mask[self.test_papers] = True
+        #mask[self.train_papers] = True
+        #mask[self.validation_papers] = True
+        #mask[self.test_papers] = True
 
-        remaining_papers = np.nonzero(~mask)[0]
+        #remaining_papers = np.nonzero(~mask)[0]
 
-        print(f"Remaining papers: {len(remaining_papers)}")
+        #print(f"Remaining papers: {len(remaining_papers)}")
         # Create neurons in batch
-        neurons = [model.create_neuron(
-            threshold=cfg["paper_threshold"],
-            leak=cfg["paper_leak"],
-            refractory_period=cfg["test_ref"]
-        ) for _ in range(len(remaining_papers))]
+        #neurons = [model.create_neuron(
+        #    threshold=cfg["paper_threshold"],
+        #    leak=cfg["paper_leak"],
+        #    refractory_period=cfg["test_ref"]
+        #) for _ in range(len(remaining_papers))]
 
         # Map neurons
-        for paper, neuron in zip(remaining_papers, neurons):
-            self.paper_neurons[paper] = neuron
+        #for paper, neuron in zip(remaining_papers, neurons):
+        #    self.paper_neurons[paper] = neuron
 
         #for paper in tqdm.tqdm(remaining_papers):
         #    self.paper_neurons[paper] = model.create_neuron(
@@ -126,8 +126,194 @@ class SGNN(GraphData):
         #        leak=cfg["paper_leak"],
         #        refractory_period=cfg["test_ref"],
         #    )
+        topic_synapse_creation = False
+        import os
+        stdp_synapse_creation = True
+        if stdp_synapse_creation:
 
-        if self.config["dataset"] == "mag240m":
+            import numpy as np
+            import os
+
+            stdp_syn_file = "/lustre/orion/lrn088/proj-shared/HyperNeuro/gautama/topic_stdp.bin"
+
+            if os.path.exists(stdp_syn_file):
+                os.remove(stdp_syn_file)
+
+            dtype = np.dtype([
+                ("pre", np.int32),
+                ("post", np.int32),
+                ("stdp", np.int16),
+            ])
+
+            buffer_size = 1_000_000
+            buf = np.empty(buffer_size, dtype=dtype)
+            buf_idx = 0
+
+            fout = open(stdp_syn_file, "ab")
+
+            NUM_PAPERS = 121751666
+
+            stdp_off = np.int16(0)
+            stdp_on = np.int16(1)
+
+            # ----------------------------------------
+            # TRAIN → STDP OFF
+            # ----------------------------------------
+            for paper in self.train_papers:
+                topic = self.papers[paper].label
+                topic_neuron = NUM_PAPERS + topic
+
+                # p → t
+                if buf_idx >= buffer_size:
+                    buf[:buf_idx].tofile(fout)
+                    buf_idx = 0
+                buf[buf_idx] = (paper, topic_neuron, stdp_off)
+                buf_idx += 1
+
+                # t → p
+                if buf_idx >= buffer_size:
+                    buf[:buf_idx].tofile(fout)
+                    buf_idx = 0
+                buf[buf_idx] = (topic_neuron, paper, stdp_off)
+                buf_idx += 1
+
+
+            # ----------------------------------------
+            # VALIDATION → STDP ON
+            # ----------------------------------------
+            for paper in self.validation_papers:
+                for topic in self.topics:
+                    topic_neuron = NUM_PAPERS + topic
+
+                    # p → t
+                    if buf_idx >= buffer_size:
+                        buf[:buf_idx].tofile(fout)
+                        buf_idx = 0
+                    buf[buf_idx] = (paper, topic_neuron, stdp_on)
+                    buf_idx += 1
+
+                    # t → p
+                    if buf_idx >= buffer_size:
+                        buf[:buf_idx].tofile(fout)
+                        buf_idx = 0
+                    buf[buf_idx] = (topic_neuron, paper, stdp_on)
+                    buf_idx += 1
+
+
+            # ----------------------------------------
+            # TEST → STDP ON
+            # ----------------------------------------
+            for paper in self.test_papers:
+                for topic in self.topics:
+                    topic_neuron = NUM_PAPERS + topic
+
+                    # p → t
+                    if buf_idx >= buffer_size:
+                        buf[:buf_idx].tofile(fout)
+                        buf_idx = 0
+                    buf[buf_idx] = (paper, topic_neuron, stdp_on)
+                    buf_idx += 1
+
+                    # t → p
+                    if buf_idx >= buffer_size:
+                        buf[:buf_idx].tofile(fout)
+                        buf_idx = 0
+                    buf[buf_idx] = (topic_neuron, paper, stdp_on)
+                    buf_idx += 1
+
+
+            # FINAL FLUSH
+            if buf_idx > 0:
+                buf[:buf_idx].tofile(fout)
+
+            fout.close()
+
+            print("topic_stdp.bin created with offset indexing")       
+        if topic_synapse_creation:
+            import numpy as np
+            import os
+
+            topic_file = "/lustre/orion/lrn088/proj-shared/HyperNeuro/gautama/paper_to_topic.bin"
+
+            if os.path.exists(topic_file):
+                os.remove(topic_file)
+
+            dtype = np.dtype([
+                ("pre", np.int32),    # paper neuron id
+                ("post", np.int32),   # topic neuron id (offset)
+                ("weight", np.int16),
+            ])
+
+            buffer_size = 1_000_000
+            buf = np.empty(buffer_size, dtype=dtype)
+            buf_idx = 0
+
+            fout = open(topic_file, "ab")
+
+            NUM_PAPERS = 121751666  # start of topic neurons
+
+            # ----------------------------------------
+            # TRAIN (only correct label)
+            # ----------------------------------------
+            w_train = np.int16(cfg["train_to_topic_weight"])
+
+            for paper in self.train_papers:
+                topic = self.papers[paper].label
+
+                topic_neuron = NUM_PAPERS + topic
+
+                if buf_idx >= buffer_size:
+                    buf[:buf_idx].tofile(fout)
+                    buf_idx = 0
+
+                buf[buf_idx] = (paper, topic_neuron, w_train)
+                buf_idx += 1
+
+
+            # ----------------------------------------
+            # VALIDATION (all topics)
+            # ----------------------------------------
+            w_val = np.int16(cfg["validation_to_topic_weight"])
+
+            for paper in self.validation_papers:
+                for topic in self.topics:
+
+                    topic_neuron = NUM_PAPERS + topic
+
+                    if buf_idx >= buffer_size:
+                        buf[:buf_idx].tofile(fout)
+                        buf_idx = 0
+
+                    buf[buf_idx] = (paper, topic_neuron, w_val)
+                    buf_idx += 1
+
+
+            # ----------------------------------------
+            # TEST (all topics)
+            # ----------------------------------------
+            w_test = np.int16(cfg["test_to_topic_weight"])
+
+            for paper in self.test_papers:
+                for topic in self.topics:
+
+                    topic_neuron = NUM_PAPERS + topic
+
+                    if buf_idx >= buffer_size:
+                        buf[:buf_idx].tofile(fout)
+                        buf_idx = 0
+
+                    buf[buf_idx] = (paper, topic_neuron, w_test)
+                    buf_idx += 1
+
+
+            # FINAL FLUSH
+            if buf_idx > 0:
+                buf[:buf_idx].tofile(fout)
+
+            fout.close()
+
+            print("paper_to_topic.bin created with topic offset")
+        if self.config["dataset"] == "xmag240m":
 
             import os, gc, psutil
 
@@ -219,7 +405,7 @@ class SGNN(GraphData):
                 print(f"Synapse file built. Total edges: {total_valid}")
                 print_mem("After build")
 
-            else:
+            elif database:
                 print("synapses.bin found → skipping build")
 
             # ========================================
@@ -235,7 +421,7 @@ class SGNN(GraphData):
 
             fin = open(syn_file, "rb")
 
-            chunk_synapses = 40_000_000   # increase for fewer iterations
+            chunk_synapses = 5_000_000   # increase for fewer iterations
 
             chunk_counter = 0
 
@@ -398,168 +584,8 @@ class SGNN(GraphData):
             print("All synapses loaded")
             print_mem("After full load")
 
-        elif self.config["dataset"] == "pmag240m":
-
-            import gc
-            import psutil
-            import os
-            
-            cfg = self.config
-
-            papers = self.graph[0]
-            cited = self.graph[1]
-
-            num_edges = papers.shape[0]
-
-            # Known constant for MAG240M
-            NUM_PAPERS = 121751666
-
-            # ---------------------------------------------------
-            # Memory monitor
-            # ---------------------------------------------------
-            def print_mem(prefix=""):
-                process = psutil.Process(os.getpid())
-                mem_gb = process.memory_info().rss / 1e9
-                print(f"{prefix} RAM usage: {mem_gb:.2f} GB")
-
-            print_mem("Before lookup build")
-
-            # ---------------------------------------------------
-            # Build lookup table
-            # ---------------------------------------------------
-            paper_to_neuron = np.full(NUM_PAPERS, -1, dtype=np.int32)
-
-            for paper_id, neuron_id in self.paper_neurons.items():
-                paper_to_neuron[paper_id] = neuron_id
-
-            print("Paper→Neuron lookup built")
-            print_mem("After lookup build")
-
-            # ---------------------------------------------------
-            # Pre-bind for speed
-            # ---------------------------------------------------
-            create_synapse = model.create_synapse
-            weight = cfg["graph_weight"]
-            delay = cfg["graph_delay"]
-
-            # ---------------------------------------------------
-            # IMPORTANT: safe chunk size
-            # ---------------------------------------------------
-            chunk_size = 40_000_000   # DO NOT increase for now
-
-            total_valid = 0
-
-            # ---------------------------------------------------
-            # Main loop
-            # ---------------------------------------------------
-            for chunk_id, start in enumerate(tqdm.tqdm(range(0, num_edges, chunk_size))):
-
-                end = min(start + chunk_size, num_edges)
-
-                # Load chunk (memmap-friendly)
-                p_chunk = papers[start:end]
-                c_chunk = cited[start:end]
-
-                # Map to neuron IDs
-                pre = paper_to_neuron[p_chunk]
-                post = paper_to_neuron[c_chunk]
-
-                # ---------------------------------------------------
-                # STREAM PROCESSING (NO LARGE FILTER ARRAYS)
-                # ---------------------------------------------------
-                valid_count = 0
-
-                for i in range(len(pre)):
-                    p = pre[i]
-                    q = post[i]
-
-                    if p == -1 or q == -1 or p == q:
-                        continue
-
-                    create_synapse(p, q, weight=weight, delay=delay, exist="overwrite")
-                    create_synapse(q, p, weight=weight, delay=delay, exist="overwrite")
-
-                    valid_count += 1
-
-                total_valid += valid_count
-
-                # ---------------------------------------------------
-                # Logging
-                # ---------------------------------------------------
-                print(f"Processed edges {start:,} → {end:,} | valid edges: {valid_count:,}")
-
-                # Print memory every few chunks
-                if chunk_id % 5 == 0:
-                    print_mem(f"After chunk {chunk_id}")
-
-                # ---------------------------------------------------
-                # CRITICAL: free memory
-                # ---------------------------------------------------
-                del p_chunk, c_chunk, pre, post
-                gc.collect()
-
-            print(f"Total valid MAG240M edges: {total_valid}")
-            print_mem("Final")
-
-
-        elif self.config["dataset"] == "omag240m":
-
-            cfg = self.config
-
-            papers = self.graph[0]
-            cited = self.graph[1]
-
-            num_edges = papers.shape[0]
-
-            NUM_PAPERS = 121751666
-
-            # lookup table
-            paper_to_neuron = np.full(NUM_PAPERS, -1, dtype=np.int32)
-
-            for paper_id, neuron_id in self.paper_neurons.items():
-                paper_to_neuron[paper_id] = neuron_id
-
-            print("Paper→Neuron lookup built")
-
-            create_synapse = model.create_synapse
-            weight = cfg["graph_weight"]
-            delay = cfg["graph_delay"]
-
-            chunk_size = 10_000_000  # tune for memory/cache
-
-            total_valid = 0
-
-            for start in tqdm.tqdm(range(0, num_edges, chunk_size)):
-
-                end = min(start + chunk_size, num_edges)
-
-                p_chunk = papers[start:end]
-                c_chunk = cited[start:end]
-
-                pre = paper_to_neuron[p_chunk]
-                post = paper_to_neuron[c_chunk]
-
-                valid = (pre != -1) & (post != -1) & (pre != post)
-
-                pre = pre[valid]
-                post = post[valid]
-
-                total_valid += len(pre)
-
-                for i in range(len(pre)):
-
-                    p = pre[i]
-                    q = post[i]
-
-                    create_synapse(p, q, weight=weight, delay=delay, exist="overwrite")
-                    create_synapse(q, p, weight=weight, delay=delay, exist="overwrite")
-
-                print(f"Processed edges {start:,} → {end:,}")
-
-            print(f"Total valid MAG240M edges: {total_valid}")
-        # Create bi-directional synapse for each edge in the graph
-      
-        else:
+     
+        elif self.config["dataset"] == "xmag240m":
             for edge in self.graph.edges:
                 paper, cited = edge
                 if paper not in self.paper_neurons or cited not in self.paper_neurons:
@@ -570,7 +596,7 @@ class SGNN(GraphData):
                     continue
                 model.create_synapse(pre, post, weight=cfg["graph_weight"], delay=cfg["graph_delay"])
                 model.create_synapse(post, pre, weight=cfg["graph_weight"], delay=cfg["graph_delay"])
-
+        
         for paper in self.train_papers:
             p = self.paper_neurons[paper]
             t = self.topic_neurons[self.papers[paper].label]
