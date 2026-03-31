@@ -64,7 +64,7 @@ features: false  # Choices: [0,1]
 
 simtime: 50  # Choices: [5., 10., 20., 30., 40., 50., 75., 100., 150., 200.]
 apos: [1.0, .5, .1, .01, .001]
-aneg: !np "[-0.0001] * 5"
+aneg: [-0.0001] #!np "[-0.0001] * 5"
 stdp_timesteps: 5
 # backend: auto
 # processes: auto  # Adjust based on machine capabilities
