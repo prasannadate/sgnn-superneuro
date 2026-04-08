@@ -33,10 +33,10 @@ paper_leak: 0.0  # Choices: [1., 10., 100., 100000.]
 #train_ref: 1  # Choices: [1.0, 5.0, 10.0, 100.0, 1000.0]
 #test_ref: 1000  # Same as validation_ref
 #validation_ref: 1000  # Choices: [1.0, 5.0, 10.0, 100.0, 1000.0]
-topic_threshold: 1.0  # Choices: [0.25, 0.5, 0.75, 1.0, 1.5]
+topic_threshold: 0.5  # Choices: [0.25, 0.5, 0.75, 1.0, 1.5]
 topic_leak: 0.0  # Choices: [1., 10., 100., 100000.]
 graph_weight: 10.0  # Choices: [0.5, 1.0, 10.0, 100.0]
-train_to_topic_weight: 5.0  # Choices: [0.5, 1.0, 10.0, 100.0]
+train_to_topic_weight: 1.0  # Choices: [0.5, 1.0, 10.0, 100.0]
 test_to_topic_weight: 0.001  # Choices: [0.001, 0.005, 0.01, 0.05, 0.1]
 validation_to_topic_weight: 0.001  # Choices: [0.001, 0.005, 0.01, 0.05, 0.1]
 # # keep delays at 1 for larger datasets or you may crash your computer
@@ -62,8 +62,8 @@ features: false  # Choices: [0,1]
 # paper_to_feature_stdp: False
 # paper_to_feature_weighted: False
 
-simtime: 50  # Choices: [5., 10., 20., 30., 40., 50., 75., 100., 150., 200.]
-apos: [1.0, 0.5, 0.1, 0.01, 0.001] #1.0, 1.0, 1.0, 1.0] #.5, .1, .01, .001]
+simtime: 30  # Choices: [5., 10., 20., 30., 40., 50., 75., 100., 150., 200.]
+apos: [0.1, 0.05, 0.01, 0.001, 0.0001] #[1.0, 0.5, 0.1, 0.01, 0.001] #1.0, 1.0, 1.0, 1.0] #.5, .1, .01, .001]
 aneg: [-0.0001, -0.0001, -0.0001, -0.0001, -0.0001] #!np "[-0.0001] * 5"
 stdp_time_steps: 5
 # backend: auto
