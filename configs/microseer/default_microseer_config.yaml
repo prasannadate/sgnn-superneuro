@@ -21,7 +21,7 @@ validation_topics_mult: 3  # multiply by num_topics to get number of val papers
 #   - test
 #   - null  # this line lets you comment out any of the above three lines
 # test_only_first: 1000  # only evaluate the first 1000 papers in the selected set. Set to `false` or `null` to evaluate all papers in the selected set.
-# legacy_split: true  # if true, use the legacy split method
+legacy_split: false  # if true, use the legacy split method
 seed: 120
 
 # paper_threshold: 1.0  # Choices: [0.25, 0.5, 0.75, 1.0, 1.5]
