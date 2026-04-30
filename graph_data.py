@@ -160,14 +160,14 @@ class GraphData():
             yield paper, cited
 
     def load_topics(self):
-        topics = set()
+        topics = {}
         self.ordered_paper_ids = order = []
         if self.nodes_path.suffix == ".content":
             with open(self.nodes_path, 'r') as f:
                 lines = f.readlines()
             for line in lines:
                 paper_id, *_features, label = line.strip().split()
-                topics.add(label)
+                topics[label] = None
                 self.papers[paper_id].label = label
                 order.append(paper_id)
         elif self.nodes_path.suffix == ".tab":
@@ -177,7 +177,7 @@ class GraphData():
             for line in lines:
                 fields = line.strip().split()  # split on tab separator
                 paper_idx, label, *_features = fields  # extract paper name and topic/label
-                topics.add(label)
+                topics[label] = None
                 paper_idx = int(paper_idx.strip().removeprefix("paper:"))  # make paper ID an int
                 self.papers[paper_idx].label = label  # associate paper ID (as int) with topic/label
                 order.append(paper_idx)
